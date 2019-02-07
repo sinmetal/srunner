@@ -15,8 +15,8 @@ import (
 const Service = "srunner"
 
 type EnvConfig struct {
-	SpannerDatabase string
-	Goroutine       int
+	SpannerDatabase string `required:"true"`
+	Goroutine       int    `default:"10"`
 }
 
 func main() {
