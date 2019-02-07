@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/codes"
 	"hash/crc32"
 	"math/rand"
 	"sync"
@@ -81,10 +82,44 @@ func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 						endCh <- err
 					}
 					for _, id := range ids {
+						ctx, span := startSpan(ctx, "/go/updateTweet")
+						defer span.End()
 						if err := ts.Update(ctx, id.ID); err != nil {
+							ecode := spanner.ErrCode(err)
+							if ecode == codes.NotFound {
+								fmt.Printf("TWEET NOTFOUND ID = %s, i = %d\n", id, i)
+								continue
+							}
 							endCh <- err
 						}
 						fmt.Printf("TWEET_UPDATE ID = %s, i = %d\n", id, i)
+					}
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
+
+func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "/go/getNotFoundTweet")
+					defer span.End()
+
+					key := spanner.Key{uuid.New().String()}
+					_, err := ts.Get(ctx, key)
+					if err != nil {
+						ecode := spanner.ErrCode(err)
+						if ecode != codes.NotFound {
+							endCh <- err
+						}
 					}
 				}(i)
 			}
