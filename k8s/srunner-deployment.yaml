@@ -1,0 +1,24 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    name: srunner-dep
+  name: srunner-dep
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: srunner-dep
+    spec:
+      containers:
+      - image: gcr.io/$PROJECT_ID/sinmetal/srunner/master
+        name: srunner-dep
+        resources:
+          limits:
+            cpu: "8"
+          requests:
+            cpu: "3"
+        envFrom:
+          - configMapRef:
+              name: srunner-config
