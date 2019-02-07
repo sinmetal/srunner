@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/codes"
 	"hash/crc32"
 	"time"
 
@@ -85,6 +86,10 @@ func (s defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, er
 
 	row, err := s.sc.Single().ReadRow(ctx, s.TableName(), key, []string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"})
 	if err != nil {
+		ecode := spanner.ErrCode(err)
+		if ecode == codes.NotFound {
+			return nil, err
+		}
 		return nil, errors.WithStack(err)
 	}
 	var tweet Tweet
@@ -171,10 +176,6 @@ func (s *defaultTweetStore) Update(ctx context.Context, id string) error {
 
 	_, err := s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		tr, err := txn.ReadRow(ctx, s.TableName(), spanner.Key{id}, []string{"Count"})
-		if err != nil {
-			return err
-		}
-		_, err = txn.ReadRow(ctx, "Tweet", spanner.Key{id}, []string{"Id"})
 		if err != nil {
 			return err
 		}

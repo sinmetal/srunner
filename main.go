@@ -37,7 +37,9 @@ func main() {
 	}
 
 	{
-		exporter, err := stackdriver.NewExporter(stackdriver.Options{})
+		exporter, err := stackdriver.NewExporter(stackdriver.Options{
+			ProjectID: project,
+		})
 		if err != nil {
 			panic(err)
 		}
@@ -56,6 +58,7 @@ func main() {
 	goInsertTweet(ts, env.Goroutine, endCh)
 	goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	goUpdateTweet(ts, env.Goroutine, endCh)
+	goGetNotFoundTweet(ts, env.Goroutine, endCh)
 
 	err = <-endCh
 	fmt.Printf("BOMB %+v", err)
