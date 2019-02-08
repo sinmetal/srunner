@@ -122,7 +122,7 @@ func goGetExitsTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					for _, id := range ids {
 						id := id
 						f := func(id string) {
-							ctx, span := startSpan(ctx, "/go/getFoundTweet")
+							ctx, span := startSpan(ctx, "/go/getExitsTweet")
 							defer span.End()
 
 							key := spanner.Key{id}
