@@ -41,10 +41,10 @@ type Tweet struct {
 	ID             string `spanner:"Id"`
 	Author         string
 	Content        string
-	Count          int
+	Count          int64
 	Favos          []string
-	Sort           int
-	ShardCreatedAt int
+	Sort           int64
+	ShardCreatedAt int64
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	CommitedAt     time.Time
@@ -208,7 +208,7 @@ func (s *defaultTweetStore) InsertBench(ctx context.Context, id string) error {
 		ID:             id,
 		Content:        id,
 		Favos:          []string{},
-		ShardCreatedAt: int(shardId),
+		ShardCreatedAt: int64(shardId),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 		CommitedAt:     spanner.CommitTimestamp,
@@ -230,7 +230,7 @@ func (s *defaultTweetStore) InsertBench(ctx context.Context, id string) error {
 			ID:             id,
 			Content:        id,
 			Favos:          []string{},
-			ShardCreatedAt: int(shardId),
+			ShardCreatedAt: int64(shardId),
 			CreatedAt:      now,
 			UpdatedAt:      now,
 			CommitedAt:     spanner.CommitTimestamp,
