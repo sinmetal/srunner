@@ -82,17 +82,21 @@ func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 						endCh <- err
 					}
 					for _, id := range ids {
-						ctx, span := startSpan(ctx, "/go/updateTweet")
-						defer span.End()
-						if err := ts.Update(ctx, id.ID); err != nil {
-							ecode := spanner.ErrCode(err)
-							if ecode == codes.NotFound {
-								fmt.Printf("TWEET NOTFOUND ID = %s, i = %d\n", id, i)
-								continue
+						id := id
+						f := func(id string) {
+							ctx, span := startSpan(ctx, "/go/updateTweet")
+							defer span.End()
+							if err := ts.Update(ctx, id); err != nil {
+								ecode := spanner.ErrCode(err)
+								if ecode == codes.NotFound {
+									fmt.Printf("TWEET NOTFOUND ID = %s, i = %d\n", id, i)
+									return
+								}
+								endCh <- err
 							}
-							endCh <- err
+							fmt.Printf("TWEET_UPDATE ID = %s, i = %d\n", id, i)
 						}
-						fmt.Printf("TWEET_UPDATE ID = %s, i = %d\n", id, i)
+						f(id.ID)
 					}
 				}(i)
 			}
