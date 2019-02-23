@@ -172,3 +172,30 @@ func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 		}
 	}()
 }
+
+func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "/go/getTweet3Tables")
+					defer span.End()
+
+					key := spanner.Key{uuid.New().String()}
+					_, err := ts.GetTweet3Tables(ctx, key)
+					if err != nil {
+						ecode := spanner.ErrCode(err) // NOTFOUNDの時はGetTweet3Tablesがerr=nilで返してくるので、実際にはここは意味ない
+						if ecode != codes.NotFound {
+							endCh <- err
+						}
+					}
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
