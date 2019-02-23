@@ -72,7 +72,7 @@ func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) error {
 		m,
 	}
 
-	_, err = s.sc.Apply(ctx, ms)
+	_, err = s.sc.Apply(ctx, ms, spanner.ApplyAtLeastOnce())
 	if err != nil {
 		return errors.WithStack(err)
 	}

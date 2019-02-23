@@ -22,7 +22,10 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				go func(i int) {
 					defer wg.Done()
 					ctx := context.Background()
-					id := uuid.New().String()
+					id := "hoge"
+					if rand.Int()%2 == 0 {
+						id = uuid.New().String()
+					}
 					now := time.Now()
 					shardId := crc32.ChecksumIEEE([]byte(now.String())) % 10
 
@@ -37,9 +40,11 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 						UpdatedAt:      now,
 						CommitedAt:     spanner.CommitTimestamp,
 					}); err != nil {
-						endCh <- err
+						fmt.Printf("failed insert %s\n", err.Error())
+						return
 					}
 					fmt.Printf("TWEET_INSERT ID = %s, i = %d\n", id, i)
+					time.Sleep(1 * time.Second)
 				}(i)
 			}
 			wg.Wait()
