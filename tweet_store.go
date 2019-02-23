@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/codes"
+	"go.opencensus.io/trace"
 	"hash/crc32"
 	"time"
 
@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
 )
 
 // TweetStore is TweetTable Functions
@@ -20,6 +21,7 @@ type TweetStore interface {
 	InsertBench(ctx context.Context, id string) error
 	Update(ctx context.Context, id string) error
 	Get(ctx context.Context, key spanner.Key) (*Tweet, error)
+	GetTweet3Tables(ctx context.Context, key spanner.Key) ([]*Tweet, error)
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
 	QueryResultStruct(ctx context.Context) ([]*TweetIDAndAuthor, error)
 }
@@ -80,7 +82,7 @@ func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) error {
 	return nil
 }
 
-func (s defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, error) {
+func (s *defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, error) {
 	ctx, span := startSpan(ctx, "/tweet/get")
 	defer span.End()
 
@@ -97,6 +99,84 @@ func (s defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, er
 		return nil, errors.WithStack(err)
 	}
 	return &tweet, nil
+}
+
+func (s *defaultTweetStore) GetTweet3Tables(ctx context.Context, key spanner.Key) ([]*Tweet, error) {
+	ctx, span := startSpan(ctx, "/tweet/getTweet3Tables")
+	defer span.End()
+
+	var results []*Tweet
+
+	err := func() error {
+		ctx, span := trace.StartSpan(ctx, "getTweet")
+		defer span.End()
+
+		row, err := s.sc.Single().ReadRow(ctx, s.TableName(), key, []string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"})
+		if err != nil {
+			ecode := spanner.ErrCode(err)
+			if ecode == codes.NotFound {
+				return nil
+			}
+			return errors.WithStack(err)
+		}
+		var tweet Tweet
+		if err := row.ToStruct(&tweet); err != nil {
+			return errors.WithStack(err)
+		}
+		results = append(results, &tweet)
+		return nil
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	err = func() error {
+		ctx, span := trace.StartSpan(ctx, "getTweetDummy1")
+		defer span.End()
+
+		row, err := s.sc.Single().ReadRow(ctx, "TweetDummy1", key, []string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"})
+		if err != nil {
+			ecode := spanner.ErrCode(err)
+			if ecode == codes.NotFound {
+				return nil
+			}
+			return errors.WithStack(err)
+		}
+		var tweet Tweet
+		if err := row.ToStruct(&tweet); err != nil {
+			return errors.WithStack(err)
+		}
+		results = append(results, &tweet)
+		return nil
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	err = func() error {
+		ctx, span := trace.StartSpan(ctx, "getTweetDummy2")
+		defer span.End()
+
+		row, err := s.sc.Single().ReadRow(ctx, "TweetDummy2", key, []string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"})
+		if err != nil {
+			ecode := spanner.ErrCode(err)
+			if ecode == codes.NotFound {
+				return nil
+			}
+			return errors.WithStack(err)
+		}
+		var tweet Tweet
+		if err := row.ToStruct(&tweet); err != nil {
+			return errors.WithStack(err)
+		}
+		results = append(results, &tweet)
+		return nil
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
 
 // Query is Tweet を sort_ascで取得する
