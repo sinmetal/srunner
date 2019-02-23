@@ -39,7 +39,7 @@ func main() {
 	{
 		exporter, err := stackdriver.NewExporter(stackdriver.Options{
 			ProjectID:                project,
-			TraceSpansBufferMaxBytes: 24 * 1024 * 1024, // defaultが8MBなので、3倍にしてみた
+			TraceSpansBufferMaxBytes: 64 * 1024 * 1024, // defaultが8MBなので、8倍にしてみた
 		})
 		if err != nil {
 			panic(err)
