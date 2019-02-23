@@ -193,6 +193,20 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 							endCh <- err
 						}
 					}
+					now := time.Now()
+					if err := ts.Insert(ctx, &Tweet{
+						ID:             uuid.New().String(),
+						Author:         "getTweet3Tables",
+						Content:        "",
+						Favos:          getAuthors(),
+						Sort:           rand.Int63n(100000000),
+						ShardCreatedAt: rand.Int63n(10),
+						CreatedAt:      now,
+						UpdatedAt:      now,
+						CommitedAt:     spanner.CommitTimestamp,
+					}); err != nil {
+						endCh <- err
+					}
 				}(i)
 			}
 			wg.Wait()
