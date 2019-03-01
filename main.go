@@ -5,11 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"cloud.google.com/go/profiler"
-	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/sinmetal/gcpmetadata"
-	"go.opencensus.io/trace"
 )
 
 const Service = "srunner"
@@ -25,28 +21,6 @@ func main() {
 		log.Fatal(err.Error())
 	}
 	log.Printf("ENV_CONFIG %+v\n", env)
-
-	project, err := gcpmetadata.GetProjectID()
-	if err != nil {
-		panic(err)
-	}
-
-	// Profiler initialization, best done as early as possible.
-	if err := profiler.Start(profiler.Config{ProjectID: project, Service: Service, ServiceVersion: "0.0.1"}); err != nil {
-		panic(err)
-	}
-
-	{
-		exporter, err := stackdriver.NewExporter(stackdriver.Options{
-			ProjectID:                project,
-			TraceSpansBufferMaxBytes: 128 * 1024 * 1024, // defaultが8MBだが、めっちゃ増やしてみた
-		})
-		if err != nil {
-			panic(err)
-		}
-		trace.RegisterExporter(exporter)
-		trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
-	}
 
 	ctx := context.Background()
 	sc, err := createClient(ctx, env.SpannerDatabase)
