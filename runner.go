@@ -182,8 +182,6 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 				go func(i int) {
 					defer wg.Done()
 					ctx := context.Background()
-					ctx, span := startSpan(ctx, "/go/getTweet3Tables")
-					defer span.End()
 
 					var cancel context.CancelFunc
 					if _, hasDeadline := ctx.Deadline(); !hasDeadline {

@@ -102,9 +102,6 @@ func (s *defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, e
 }
 
 func (s *defaultTweetStore) GetTweet3Tables(ctx context.Context, key spanner.Key) ([]*Tweet, error) {
-	ctx, span := startSpan(ctx, "/tweet/getTweet3Tables")
-	defer span.End()
-
 	var results []*Tweet
 
 	err := func() error {
@@ -131,9 +128,6 @@ func (s *defaultTweetStore) GetTweet3Tables(ctx context.Context, key spanner.Key
 	}
 
 	err = func() error {
-		ctx, span := trace.StartSpan(ctx, "getTweetDummy1")
-		defer span.End()
-
 		row, err := s.sc.Single().ReadRow(ctx, "TweetDummy1", key, []string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"})
 		if err != nil {
 			ecode := spanner.ErrCode(err)
@@ -154,9 +148,6 @@ func (s *defaultTweetStore) GetTweet3Tables(ctx context.Context, key spanner.Key
 	}
 
 	err = func() error {
-		ctx, span := trace.StartSpan(ctx, "getTweetDummy2")
-		defer span.End()
-
 		row, err := s.sc.Single().ReadRow(ctx, "TweetDummy2", key, []string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"})
 		if err != nil {
 			ecode := spanner.ErrCode(err)
