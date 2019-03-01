@@ -185,6 +185,11 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 					ctx, span := startSpan(ctx, "/go/getTweet3Tables")
 					defer span.End()
 
+					var cancel context.CancelFunc
+					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+						ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
+						defer cancel()
+					}
 					key := spanner.Key{uuid.New().String()}
 					_, err := ts.GetTweet3Tables(ctx, key)
 					if err != nil {
@@ -192,20 +197,6 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 						if ecode != codes.NotFound {
 							endCh <- err
 						}
-					}
-					now := time.Now()
-					if err := ts.Insert(ctx, &Tweet{
-						ID:             uuid.New().String(),
-						Author:         "getTweet3Tables",
-						Content:        "",
-						Favos:          getAuthors(),
-						Sort:           rand.Int63n(100000000),
-						ShardCreatedAt: rand.Int63n(10),
-						CreatedAt:      now,
-						UpdatedAt:      now,
-						CommitedAt:     spanner.CommitTimestamp,
-					}); err != nil {
-						endCh <- err
 					}
 				}(i)
 			}
