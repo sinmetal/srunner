@@ -4,15 +4,20 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 const Service = "srunner"
 
 type EnvConfig struct {
 	SpannerDatabase string `required:"true"`
-	Goroutine       int    `default:"10"`
+	Goroutine       int    `default:"3"`
 }
 
 func main() {
@@ -23,7 +28,19 @@ func main() {
 	log.Printf("ENV_CONFIG %+v\n", env)
 
 	ctx := context.Background()
-	sc, err := createClient(ctx, env.SpannerDatabase)
+	sc, err := createClient(ctx, env.SpannerDatabase, option.WithGRPCDialOption(
+		grpc.WithDialer(func(addr string, t time.Duration) (net.Conn, error) {
+			defer func(n time.Time) {
+				fmt.Printf("Dial time: %v\n", time.Since(n))
+			}(time.Now())
+			return net.DialTimeout("tcp", addr, t)
+		}),
+	),
+		option.WithGRPCDialOption(
+			grpc.WithTransportCredentials(&wrapTransportCredentials{
+				TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
+			}),
+		))
 	if err != nil {
 		panic(err)
 	}
