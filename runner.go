@@ -184,11 +184,15 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
+
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "/go/getNotFoundTweet")
+					defer span.End()
+
 					fmt.Printf("%+v goGetTweet3Tables GoRoutine:%d\n", time.Now(), i)
 					defer func(n time.Time) {
 						fmt.Printf("goGetTweet3Tables_time: %v\n", time.Since(n))
 					}(time.Now())
-					ctx := context.Background()
 
 					var cancel context.CancelFunc
 					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
