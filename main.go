@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
-	"time"
 
+	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/sinmetal/gcpmetadata"
+	"go.opencensus.io/trace"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -27,15 +28,24 @@ func main() {
 	}
 	log.Printf("ENV_CONFIG %+v\n", env)
 
+	project, err := gcpmetadata.GetProjectID()
+	if err != nil {
+		panic(err)
+	}
+
+	{
+		exporter, err := stackdriver.NewExporter(stackdriver.Options{
+			ProjectID: project,
+		})
+		if err != nil {
+			panic(err)
+		}
+		trace.RegisterExporter(exporter)
+		trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+	}
+
 	ctx := context.Background()
-	sc, err := createClient(ctx, env.SpannerDatabase, option.WithGRPCDialOption(
-		grpc.WithDialer(func(addr string, t time.Duration) (net.Conn, error) {
-			defer func(n time.Time) {
-				fmt.Printf("Dial time: %v\n", time.Since(n))
-			}(time.Now())
-			return net.DialTimeout("tcp", addr, t)
-		}),
-	),
+	sc, err := createClient(ctx, env.SpannerDatabase,
 		option.WithGRPCDialOption(
 			grpc.WithTransportCredentials(&wrapTransportCredentials{
 				TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
