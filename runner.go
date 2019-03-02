@@ -186,7 +186,7 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer wg.Done()
 
 					ctx := context.Background()
-					ctx, span := startSpan(ctx, "/go/getNotFoundTweet")
+					ctx, span := startSpan(ctx, "/go/goGetTweet3Tables")
 					defer span.End()
 
 					fmt.Printf("%+v goGetTweet3Tables GoRoutine:%d\n", time.Now(), i)
