@@ -204,7 +204,7 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 						}
 					}
 
-					time.Sleep(100 * time.Millisecond)
+					time.Sleep((time.Duration(100) + time.Duration(rand.Intn(300))) * time.Millisecond)
 				}(i)
 			}
 			wg.Wait()
