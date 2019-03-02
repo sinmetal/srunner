@@ -11,6 +11,8 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
+
+	_ "google.golang.org/grpc/grpclog/glogger"
 )
 
 func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
@@ -178,9 +180,14 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 		for {
 			var wg sync.WaitGroup
 			for i := 0; i < goroutine; i++ {
+				i := i
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
+					fmt.Printf("%+v goGetTweet3Tables GoRoutine:%d\n", time.Now(), i)
+					defer func(n time.Time) {
+						fmt.Printf("goGetTweet3Tables_time: %v\n", time.Since(n))
+					}(time.Now())
 					ctx := context.Background()
 
 					var cancel context.CancelFunc
