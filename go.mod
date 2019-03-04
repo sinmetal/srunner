@@ -10,5 +10,7 @@ require (
 	github.com/sinmetal/gcpmetadata v0.0.0-20190204122414-bb2afc737814
 	go.opencensus.io v0.19.0
 	google.golang.org/api v0.1.0
-	google.golang.org/grpc v1.19.0
+	google.golang.org/grpc v1.17.0
 )
+
+replace google.golang.org/grpc => github.com/kazegusuri/grpc-go v0.0.0-20190303174943-5a9bd920d6da
