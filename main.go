@@ -12,6 +12,7 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/grpclog"
 )
 
 const Service = "srunner"
@@ -22,6 +23,8 @@ type EnvConfig struct {
 }
 
 func main() {
+	grpclog.Printf("Start GRPCLOG")
+
 	var env EnvConfig
 	if err := envconfig.Process("srunner", &env); err != nil {
 		log.Fatal(err.Error())
