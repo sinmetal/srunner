@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sinmetal/gcpmetadata"
@@ -48,12 +49,21 @@ func main() {
 	}
 
 	ctx := context.Background()
+
+	// Need to specify scope for the specific service.
+	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, spanner.Scope)
+	if err != nil {
+		panic(err)
+	}
+
 	sc, err := createClient(ctx, env.SpannerDatabase,
 		option.WithGRPCDialOption(
 			grpc.WithTransportCredentials(&wrapTransportCredentials{
 				TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
 			}),
-		))
+		),
+		option.WithTokenSource(tokenSource),
+	)
 	if err != nil {
 		panic(err)
 	}
