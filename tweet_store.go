@@ -23,6 +23,7 @@ type TweetStore interface {
 	Get(ctx context.Context, key spanner.Key) (*Tweet, error)
 	GetTweet3Tables(ctx context.Context, key spanner.Key) ([]*Tweet, error)
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
+	QueryHeavy(ctx context.Context) ([]*Tweet, error)
 	QueryResultStruct(ctx context.Context) ([]*TweetIDAndAuthor, error)
 }
 
@@ -184,6 +185,35 @@ func (s *defaultTweetStore) Query(ctx context.Context, limit int) ([]*Tweet, err
 		if count >= limit {
 			return tweets, nil
 		}
+		row, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		var tweet Tweet
+		if err := row.ToStruct(&tweet); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		tweets = append(tweets, &tweet)
+		count++
+	}
+
+	return tweets, nil
+}
+
+func (s *defaultTweetStore) QueryHeavy(ctx context.Context) ([]*Tweet, error) {
+	ctx, span := startSpan(ctx, "/tweet/queryHeavy")
+	defer span.End()
+
+	iter := s.sc.Single().Query(ctx, spanner.NewStatement("SELECT * FROM Tweet WHERE Content Like  '%Hoge%' LIMIT 100"))
+	defer iter.Stop()
+
+	count := 0
+	tweets := []*Tweet{}
+	for {
 		row, err := iter.Next()
 		if err == iterator.Done {
 			break
