@@ -11,6 +11,8 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
+
+	_ "google.golang.org/grpc/grpclog/glogger"
 )
 
 func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
@@ -169,6 +171,46 @@ func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
+		}
+	}()
+}
+
+func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				i := i
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "/go/goGetTweet3Tables")
+					defer span.End()
+
+					fmt.Printf("%+v goGetTweet3Tables GoRoutine:%d\n", time.Now(), i)
+					defer func(n time.Time) {
+						fmt.Printf("goGetTweet3Tables_time: %v\n", time.Since(n))
+					}(time.Now())
+
+					var cancel context.CancelFunc
+					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+						ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
+						defer cancel()
+					}
+					key := spanner.Key{uuid.New().String()}
+					_, err := ts.GetTweet3Tables(ctx, key)
+					if err != nil {
+						ecode := spanner.ErrCode(err) // NOTFOUNDの時はGetTweet3Tablesがerr=nilで返してくるので、実際にはここは意味ない
+						if ecode != codes.NotFound {
+							endCh <- err
+						}
+					}
+				}(i)
+			}
+			wg.Wait()
+			time.Sleep((time.Duration(100) + time.Duration(rand.Intn(300))) * time.Millisecond)
 		}
 	}()
 }

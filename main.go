@@ -5,21 +5,27 @@ import (
 	"fmt"
 	"log"
 
-	"cloud.google.com/go/profiler"
+	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sinmetal/gcpmetadata"
 	"go.opencensus.io/trace"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/grpclog"
 )
 
 const Service = "srunner"
 
 type EnvConfig struct {
 	SpannerDatabase string `required:"true"`
-	Goroutine       int    `default:"10"`
+	Goroutine       int    `default:"3"`
 }
 
 func main() {
+	grpclog.Printf("Start GRPCLOG")
+
 	var env EnvConfig
 	if err := envconfig.Process("srunner", &env); err != nil {
 		log.Fatal(err.Error())
@@ -31,11 +37,6 @@ func main() {
 		panic(err)
 	}
 
-	// Profiler initialization, best done as early as possible.
-	if err := profiler.Start(profiler.Config{ProjectID: project, Service: Service, ServiceVersion: "0.0.1"}); err != nil {
-		panic(err)
-	}
-
 	{
 		exporter, err := stackdriver.NewExporter(stackdriver.Options{
 			ProjectID: project,
@@ -44,10 +45,25 @@ func main() {
 			panic(err)
 		}
 		trace.RegisterExporter(exporter)
+		trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
 	}
 
 	ctx := context.Background()
-	sc, err := createClient(ctx, env.SpannerDatabase)
+
+	// Need to specify scope for the specific service.
+	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, spanner.Scope)
+	if err != nil {
+		panic(err)
+	}
+
+	sc, err := createClient(ctx, env.SpannerDatabase,
+		option.WithGRPCDialOption(
+			grpc.WithTransportCredentials(&wrapTransportCredentials{
+				TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
+			}),
+		),
+		option.WithTokenSource(tokenSource),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -55,11 +71,12 @@ func main() {
 
 	endCh := make(chan error, 10)
 
-	goInsertTweet(ts, env.Goroutine, endCh)
-	goInsertTweetBenchmark(ts, env.Goroutine, endCh)
-	goUpdateTweet(ts, env.Goroutine, endCh)
-	goGetExitsTweet(ts, env.Goroutine, endCh)
-	goGetNotFoundTweet(ts, env.Goroutine, endCh)
+	//goInsertTweet(ts, env.Goroutine, endCh)
+	//goInsertTweetBenchmark(ts, env.Goroutine, endCh)
+	//goUpdateTweet(ts, env.Goroutine, endCh)
+	//goGetExitsTweet(ts, env.Goroutine, endCh)
+	//goGetNotFoundTweet(ts, env.Goroutine, endCh)
+	goGetTweet3Tables(ts, env.Goroutine, endCh)
 
 	err = <-endCh
 	fmt.Printf("BOMB %+v", err)
