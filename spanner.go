@@ -12,7 +12,11 @@ import (
 )
 
 func createClient(ctx context.Context, db string, o ...option.ClientOption) (*spanner.Client, error) {
-	config := spanner.ClientConfig{}
+	config := spanner.ClientConfig{
+		SessionPoolConfig: spanner.SessionPoolConfig{
+			MinOpened: 50,
+		},
+	}
 	dataClient, err := spanner.NewClientWithConfig(ctx, db, config, o...)
 	if err != nil {
 		return nil, err
