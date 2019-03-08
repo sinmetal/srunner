@@ -256,6 +256,38 @@ func goQueryHeavyTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 	}()
 }
 
+func goQueryAllTweet(ts TweetStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "/go/queryAllTweet")
+					defer span.End()
+
+					defer func(n time.Time) {
+						fmt.Printf("GoRoutine:%d goQueryAllTweet_time: %v\n", time.Since(n))
+					}(time.Now())
+
+					count, err := ts.QueryAll(ctx)
+					if err != nil {
+						ecode := spanner.ErrCode(err)
+						if ecode != codes.NotFound {
+							endCh <- err
+						}
+					}
+					fmt.Printf("goQueryAllTweet: %d\n", count)
+				}(i)
+			}
+			wg.Wait()
+			sleepLong()
+		}
+	}()
+}
+
 func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
