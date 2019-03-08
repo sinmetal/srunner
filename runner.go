@@ -24,6 +24,20 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				go func(i int) {
 					defer wg.Done()
 					ctx := context.Background()
+
+					ctx, span := startSpan(ctx, "/go/insertTweet")
+					defer span.End()
+
+					defer func(n time.Time) {
+						fmt.Printf("GoRoutine:%d goInsertTweet_time: %v\n", time.Since(n))
+					}(time.Now())
+
+					var cancel context.CancelFunc
+					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+						ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
+						defer cancel()
+					}
+
 					id := uuid.New().String()
 					now := time.Now()
 					shardId := crc32.ChecksumIEEE([]byte(now.String())) % 10
@@ -45,6 +59,7 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
+			sleep()
 		}
 	}()
 }
@@ -66,6 +81,7 @@ func goInsertTweetBenchmark(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
+			sleep()
 		}
 	}()
 }
@@ -88,6 +104,17 @@ func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 						f := func(id string) {
 							ctx, span := startSpan(ctx, "/go/updateTweet")
 							defer span.End()
+
+							defer func(n time.Time) {
+								fmt.Printf("GoRoutine:%d goUpdateTweet_time: %v\n", time.Since(n))
+							}(time.Now())
+
+							var cancel context.CancelFunc
+							if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+								ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
+								defer cancel()
+							}
+
 							if err := ts.Update(ctx, id); err != nil {
 								ecode := spanner.ErrCode(err)
 								if ecode == codes.NotFound {
@@ -103,6 +130,7 @@ func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
+			sleep()
 		}
 	}()
 }
@@ -127,6 +155,16 @@ func goGetExitsTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 							ctx, span := startSpan(ctx, "/go/getExitsTweet")
 							defer span.End()
 
+							defer func(n time.Time) {
+								fmt.Printf("GoRoutine:%d goGetExitsTweet_time: %v\n", time.Since(n))
+							}(time.Now())
+
+							var cancel context.CancelFunc
+							if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+								ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
+								defer cancel()
+							}
+
 							key := spanner.Key{id}
 							_, err := ts.Get(ctx, key)
 							if err != nil {
@@ -144,6 +182,7 @@ func goGetExitsTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
+			sleep()
 		}
 	}()
 }
@@ -160,6 +199,16 @@ func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					ctx, span := startSpan(ctx, "/go/getNotFoundTweet")
 					defer span.End()
 
+					defer func(n time.Time) {
+						fmt.Printf("GoRoutine:%d goGetNotFoundTweet_time: %v\n", time.Since(n))
+					}(time.Now())
+
+					var cancel context.CancelFunc
+					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+						ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
+						defer cancel()
+					}
+
 					key := spanner.Key{uuid.New().String()}
 					_, err := ts.Get(ctx, key)
 					if err != nil {
@@ -171,6 +220,7 @@ func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
+			sleep()
 		}
 	}()
 }
@@ -189,14 +239,13 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 					ctx, span := startSpan(ctx, "/go/goGetTweet3Tables")
 					defer span.End()
 
-					fmt.Printf("%+v goGetTweet3Tables GoRoutine:%d\n", time.Now(), i)
 					defer func(n time.Time) {
-						fmt.Printf("goGetTweet3Tables_time: %v\n", time.Since(n))
+						fmt.Printf("GoRoutine:%d goGetTweet3Tables_time: %v\n", time.Since(n))
 					}(time.Now())
 
 					var cancel context.CancelFunc
 					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-						ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
+						ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
 						defer cancel()
 					}
 					key := spanner.Key{uuid.New().String()}
@@ -210,7 +259,11 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
-			time.Sleep((time.Duration(100) + time.Duration(rand.Intn(300))) * time.Millisecond)
+			sleep()
 		}
 	}()
+}
+
+func sleep() {
+	time.Sleep((time.Duration(100) + time.Duration(rand.Intn(300))) * time.Millisecond)
 }
