@@ -29,7 +29,7 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer span.End()
 
 					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d goInsertTweet_time: %v\n", time.Since(n))
+						fmt.Printf("GoRoutine:%d goInsertTweet_time: %v\n", i, time.Since(n))
 					}(time.Now())
 
 					var cancel context.CancelFunc
@@ -106,7 +106,7 @@ func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 							defer span.End()
 
 							defer func(n time.Time) {
-								fmt.Printf("GoRoutine:%d goUpdateTweet_time: %v\n", time.Since(n))
+								fmt.Printf("GoRoutine:%d goUpdateTweet_time: %v\n", i, time.Since(n))
 							}(time.Now())
 
 							var cancel context.CancelFunc
@@ -156,7 +156,7 @@ func goGetExitsTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 							defer span.End()
 
 							defer func(n time.Time) {
-								fmt.Printf("GoRoutine:%d goGetExitsTweet_time: %v\n", time.Since(n))
+								fmt.Printf("GoRoutine:%d goGetExitsTweet_time: %v\n", i, time.Since(n))
 							}(time.Now())
 
 							var cancel context.CancelFunc
@@ -200,7 +200,7 @@ func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer span.End()
 
 					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d goGetNotFoundTweet_time: %v\n", time.Since(n))
+						fmt.Printf("GoRoutine:%d goGetNotFoundTweet_time: %v\n", i, time.Since(n))
 					}(time.Now())
 
 					var cancel context.CancelFunc
@@ -238,7 +238,7 @@ func goQueryHeavyTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer span.End()
 
 					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d goQueryHeavyTweet_time: %v\n", time.Since(n))
+						fmt.Printf("GoRoutine:%d goQueryHeavyTweet_time: %v\n", i, time.Since(n))
 					}(time.Now())
 
 					_, err := ts.QueryHeavy(ctx)
@@ -269,7 +269,7 @@ func goQueryAllTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer span.End()
 
 					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d goQueryAllTweet_time: %v\n", time.Since(n))
+						fmt.Printf("GoRoutine:%d goQueryAllTweet_time: %v\n", i, time.Since(n))
 					}(time.Now())
 
 					count, err := ts.QueryAll(ctx)
@@ -303,7 +303,7 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer span.End()
 
 					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d goGetTweet3Tables_time: %v\n", time.Since(n))
+						fmt.Printf("GoRoutine:%d goGetTweet3Tables_time: %v\n", i, time.Since(n))
 					}(time.Now())
 
 					var cancel context.CancelFunc
