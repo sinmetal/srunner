@@ -237,6 +237,7 @@ func goQueryHeavyTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					ctx, span := startSpan(ctx, "/go/queryHeavyTweet")
 					defer span.End()
 
+					fmt.Printf("GoRoutine:%d Start goQueryHeavyTweet_time: 5000ms\n", i)
 					defer func(n time.Time) {
 						fmt.Printf("GoRoutine:%d goQueryHeavyTweet_time: %v\n", i, time.Since(n))
 					}(time.Now())
@@ -268,6 +269,7 @@ func goQueryAllTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					ctx, span := startSpan(ctx, "/go/queryAllTweet")
 					defer span.End()
 
+					fmt.Printf("GoRoutine:%d Start goQueryAllTweet_time: 5000ms\n", i)
 					defer func(n time.Time) {
 						fmt.Printf("GoRoutine:%d goQueryAllTweet_time: %v\n", i, time.Since(n))
 					}(time.Now())
