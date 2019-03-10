@@ -334,5 +334,5 @@ func sleep() {
 }
 
 func sleepLong() {
-	time.Sleep(100 * time.Minute)
+	time.Sleep((time.Duration(100) + time.Duration(rand.Intn(30))) * time.Minute)
 }
