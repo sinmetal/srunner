@@ -13,7 +13,7 @@ import (
 
 func createClient(ctx context.Context, db string, o ...option.ClientOption) (*spanner.Client, error) {
 	config := spanner.ClientConfig{
-		NumChannels: 1,
+		NumChannels: 12,
 		SessionPoolConfig: spanner.SessionPoolConfig{
 			MinOpened: 50,
 		},
