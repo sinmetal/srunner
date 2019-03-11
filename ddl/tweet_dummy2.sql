@@ -18,7 +18,7 @@ ON TweetDummy2 (
 
 CREATE INDEX TweetDummy2ShardCreatedAtAscCreatedAtDesc
 ON TweetDummy2 (
-	ShardCreatedAt
+	ShardCreatedAt,
 	CreatedAt DESC
 );
 
