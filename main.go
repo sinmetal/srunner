@@ -56,29 +56,48 @@ func main() {
 		panic(err)
 	}
 
-	sc, err := createClient(ctx, env.SpannerDatabase,
-		option.WithGRPCDialOption(
-			grpc.WithTransportCredentials(&wrapTransportCredentials{
-				TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
-			}),
-		),
-		option.WithTokenSource(tokenSource),
-	)
-	if err != nil {
-		panic(err)
+	var ts1 TweetStore
+	{
+		sc, err := createClient(ctx, env.SpannerDatabase,
+			option.WithGRPCDialOption(
+				grpc.WithTransportCredentials(&wrapTransportCredentials{
+					TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
+				}),
+			),
+			option.WithTokenSource(tokenSource),
+		)
+		if err != nil {
+			panic(err)
+		}
+		ts1 = NewTweetStore(sc)
 	}
-	ts := NewTweetStore(sc)
+
+	var ts2 TweetStore
+	{
+		sc, err := createClient(ctx, env.SpannerDatabase,
+			option.WithGRPCDialOption(
+				grpc.WithTransportCredentials(&wrapTransportCredentials{
+					TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
+				}),
+			),
+			option.WithTokenSource(tokenSource),
+		)
+		if err != nil {
+			panic(err)
+		}
+		ts2 = NewTweetStore(sc)
+	}
 
 	endCh := make(chan error, 10)
 
-	goInsertTweet(ts, env.Goroutine, endCh)
+	goInsertTweet(ts1, env.Goroutine, endCh)
 	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
-	goUpdateTweet(ts, env.Goroutine, endCh)
-	goGetExitsTweet(ts, env.Goroutine, endCh)
-	goGetNotFoundTweet(ts, env.Goroutine, endCh)
-	goGetTweet3Tables(ts, env.Goroutine, endCh)
-	goQueryAllTweet(ts, env.Goroutine, endCh)
-	goQueryHeavyTweet(ts, env.Goroutine, endCh)
+	goUpdateTweet(ts1, env.Goroutine, endCh)
+	goGetExitsTweet(ts1, env.Goroutine, endCh)
+	goGetNotFoundTweet(ts1, env.Goroutine, endCh)
+	goGetTweet3Tables(ts1, env.Goroutine, endCh)
+	goQueryAllTweet(ts2, env.Goroutine, endCh)
+	goQueryHeavyTweet(ts2, env.Goroutine, endCh)
 
 	err = <-endCh
 	fmt.Printf("BOMB %+v", err)
