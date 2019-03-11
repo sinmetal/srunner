@@ -11,7 +11,7 @@ CREATE TABLE Tweet (
     CommitedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
 ) PRIMARY KEY (Id);
 
-CREATE INDEX Tweet
+CREATE INDEX TweetSortAsc
 ON Tweet (
 	Sort
 );
