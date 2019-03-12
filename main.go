@@ -77,7 +77,7 @@ func main() {
 	goGetExitsTweet(ts, env.Goroutine, endCh)
 	goGetNotFoundTweet(ts, env.Goroutine, endCh)
 	goGetTweet3Tables(ts, env.Goroutine, endCh)
-	goQueryAllTweet(ts, env.Goroutine, endCh)
+	// goQueryAllTweet(ts, env.Goroutine, endCh)
 	goQueryHeavyTweet(ts, env.Goroutine, endCh)
 
 	err = <-endCh
