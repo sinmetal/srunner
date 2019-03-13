@@ -78,7 +78,7 @@ func main() {
 	goGetNotFoundTweet(ts, env.Goroutine, endCh)
 	goGetTweet3Tables(ts, env.Goroutine, endCh)
 	goQueryAllTweet(ts, env.Goroutine, endCh)
-	goQueryHeavyTweet(ts, env.Goroutine, endCh)
+	// goQueryHeavyTweet(ts, env.Goroutine, endCh)
 
 	err = <-endCh
 	fmt.Printf("BOMB %+v", err)
