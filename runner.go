@@ -24,12 +24,13 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				go func(i int) {
 					defer wg.Done()
 					ctx := context.Background()
+					id := uuid.New().String()
 
 					ctx, span := startSpan(ctx, "/go/insertTweet")
 					defer span.End()
 
 					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d goInsertTweet_time: %v\n", i, time.Since(n))
+						fmt.Printf("GoRoutine:%d id:%s goInsertTweet_time: %v\n", i, id, time.Since(n))
 					}(time.Now())
 
 					var cancel context.CancelFunc
@@ -38,7 +39,6 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 						defer cancel()
 					}
 
-					id := uuid.New().String()
 					now := time.Now()
 					shardId := crc32.ChecksumIEEE([]byte(now.String())) % 10
 
@@ -106,7 +106,7 @@ func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 							defer span.End()
 
 							defer func(n time.Time) {
-								fmt.Printf("GoRoutine:%d goUpdateTweet_time: %v\n", i, time.Since(n))
+								fmt.Printf("GoRoutine:%d id:%s goUpdateTweet_time: %v\n", i, id, time.Since(n))
 							}(time.Now())
 
 							var cancel context.CancelFunc
@@ -156,7 +156,7 @@ func goGetExitsTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 							defer span.End()
 
 							defer func(n time.Time) {
-								fmt.Printf("GoRoutine:%d goGetExitsTweet_time: %v\n", i, time.Since(n))
+								fmt.Printf("GoRoutine:%d id:%s goGetExitsTweet_time: %v\n", i, id, time.Since(n))
 							}(time.Now())
 
 							var cancel context.CancelFunc
@@ -199,8 +199,10 @@ func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					ctx, span := startSpan(ctx, "/go/getNotFoundTweet")
 					defer span.End()
 
+					id := uuid.New().String()
+
 					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d goGetNotFoundTweet_time: %v\n", i, time.Since(n))
+						fmt.Printf("GoRoutine:%d id:%s goGetNotFoundTweet_time: %v\n", i, id, time.Since(n))
 					}(time.Now())
 
 					var cancel context.CancelFunc
@@ -209,7 +211,7 @@ func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 						defer cancel()
 					}
 
-					key := spanner.Key{uuid.New().String()}
+					key := spanner.Key{id}
 					_, err := ts.Get(ctx, key)
 					if err != nil {
 						ecode := spanner.ErrCode(err)
