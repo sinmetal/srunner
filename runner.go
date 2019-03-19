@@ -332,7 +332,7 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 }
 
 func sleep() {
-	time.Sleep((time.Duration(100) + time.Duration(rand.Intn(300))) * time.Millisecond)
+	time.Sleep((time.Duration(300) + time.Duration(rand.Intn(300))) * time.Millisecond)
 }
 
 func sleepLong() {
