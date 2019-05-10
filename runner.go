@@ -11,8 +11,6 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
-
-	_ "google.golang.org/grpc/grpclog/glogger"
 )
 
 func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
