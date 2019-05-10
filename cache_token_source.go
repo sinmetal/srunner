@@ -81,7 +81,6 @@ func (s *proactiveCacheTokenSource) Token() (*oauth2.Token, error) {
 	s.mu.RUnlock()
 
 	if tk.Valid() {
-		fmt.Println("Token().ReturnCacheToken")
 		return tk, nil
 	}
 

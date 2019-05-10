@@ -45,7 +45,7 @@ func main() {
 			panic(err)
 		}
 		trace.RegisterExporter(exporter)
-		trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+		// trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
 	}
 
 	ctx := context.Background()
@@ -71,12 +71,14 @@ func main() {
 
 	endCh := make(chan error, 10)
 
-	//goInsertTweet(ts, env.Goroutine, endCh)
-	//goInsertTweetBenchmark(ts, env.Goroutine, endCh)
-	//goUpdateTweet(ts, env.Goroutine, endCh)
-	//goGetExitsTweet(ts, env.Goroutine, endCh)
-	//goGetNotFoundTweet(ts, env.Goroutine, endCh)
+	goInsertTweet(ts, env.Goroutine, endCh)
+	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
+	goUpdateTweet(ts, env.Goroutine, endCh)
+	goGetExitsTweet(ts, env.Goroutine, endCh)
+	goGetNotFoundTweet(ts, env.Goroutine, endCh)
 	goGetTweet3Tables(ts, env.Goroutine, endCh)
+	//goQueryAllTweet(ts, env.Goroutine, endCh)
+	//goQueryHeavyTweet(ts, env.Goroutine, endCh)
 
 	err = <-endCh
 	fmt.Printf("BOMB %+v", err)
