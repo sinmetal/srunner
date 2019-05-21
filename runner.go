@@ -95,32 +95,32 @@ func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					if err != nil {
 						endCh <- err
 					}
+					f := func(id string) {
+						ctx, span := startSpan(ctx, "/go/updateTweet")
+						defer span.End()
+
+						defer func(n time.Time) {
+							fmt.Printf("GoRoutine:%d id:%s goUpdateTweet_time: %v\n", i, id, time.Since(n))
+						}(time.Now())
+
+						var cancel context.CancelFunc
+						if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+							ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
+							defer cancel()
+						}
+
+						if err := ts.Update(ctx, id); err != nil {
+							ecode := spanner.ErrCode(err)
+							if ecode == codes.NotFound {
+								fmt.Printf("TWEET NOTFOUND ID = %s, i = %d\n", id, i)
+								return
+							}
+							endCh <- err
+						}
+						fmt.Printf("TWEET_UPDATE ID = %s, i = %d\n", id, i)
+					}
 					for _, id := range ids {
 						id := id
-						f := func(id string) {
-							ctx, span := startSpan(ctx, "/go/updateTweet")
-							defer span.End()
-
-							defer func(n time.Time) {
-								fmt.Printf("GoRoutine:%d id:%s goUpdateTweet_time: %v\n", i, id, time.Since(n))
-							}(time.Now())
-
-							var cancel context.CancelFunc
-							if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-								ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
-								defer cancel()
-							}
-
-							if err := ts.Update(ctx, id); err != nil {
-								ecode := spanner.ErrCode(err)
-								if ecode == codes.NotFound {
-									fmt.Printf("TWEET NOTFOUND ID = %s, i = %d\n", id, i)
-									return
-								}
-								endCh <- err
-							}
-							fmt.Printf("TWEET_UPDATE ID = %s, i = %d\n", id, i)
-						}
 						f(id.ID)
 					}
 				}(i)
