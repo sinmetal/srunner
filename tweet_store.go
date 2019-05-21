@@ -25,7 +25,7 @@ type TweetStore interface {
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
 	QueryHeavy(ctx context.Context) ([]*Tweet, error)
 	QueryAll(ctx context.Context) (int, error)
-	QueryResultStruct(ctx context.Context) ([]*TweetIDAndAuthor, error)
+	QueryResultStruct(ctx context.Context, limit int) ([]*TweetIDAndAuthor, error)
 }
 
 var tweetStore TweetStore
@@ -269,11 +269,13 @@ type TweetIDAndAuthor struct {
 }
 
 // QueryResultStruct is StructをResultで返すQueryのサンプル
-func (s *defaultTweetStore) QueryResultStruct(ctx context.Context) ([]*TweetIDAndAuthor, error) {
+func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, limit int) ([]*TweetIDAndAuthor, error) {
 	ctx, span := startSpan(ctx, "/tweet/queryResultStruct")
 	defer span.End()
 
-	iter := s.sc.Single().Query(ctx, spanner.NewStatement("SELECT ARRAY(SELECT STRUCT(Id, Author)) As IdWithAuthor FROM Tweet LIMIT 10;"))
+	st := spanner.NewStatement("SELECT ARRAY(SELECT STRUCT(Id, Author)) As IdWithAuthor FROM Tweet LIMIT @LIMIT;")
+	st.Params["LIMIT"] = limit
+	iter := s.sc.Single().Query(ctx, st)
 	defer iter.Stop()
 
 	type Result struct {

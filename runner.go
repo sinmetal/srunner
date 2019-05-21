@@ -85,16 +85,19 @@ func goInsertTweetBenchmark(ts TweetStore, goroutine int, endCh chan<- error) {
 func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
+			ctx := context.Background()
+			ids, err := ts.QueryResultStruct(ctx, goroutine)
+			if err != nil {
+				endCh <- err
+			}
+
 			var wg sync.WaitGroup
 			for i := 0; i < goroutine; i++ {
 				wg.Add(1)
+				i := i
 				go func(i int) {
 					defer wg.Done()
-					ctx := context.Background()
-					ids, err := ts.QueryResultStruct(ctx)
-					if err != nil {
-						endCh <- err
-					}
+
 					f := func(id string) {
 						ctx, span := startSpan(ctx, "/go/updateTweet")
 						defer span.End()
@@ -119,10 +122,9 @@ func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 						}
 						fmt.Printf("TWEET_UPDATE ID = %s, i = %d\n", id, i)
 					}
-					for _, id := range ids {
-						id := id
-						f(id.ID)
-					}
+
+					id := ids[i]
+					f(id.ID)
 				}(i)
 			}
 			wg.Wait()
