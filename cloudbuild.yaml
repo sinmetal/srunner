@@ -1,12 +1,20 @@
 steps:
-- name: 'golang:1.11.1-stretch'
+- name: gcr.io/cloud-builders/docker
+  args: ['run', '-d', '--network=cloudbuild', '--name=handy-spanner', 'gcr.io/gcpug-container/handy-spanner:870baec']
+- name: jwilder/dockerize:0.6.1
+  args: ['dockerize', '-timeout=60s', '-wait=tcp://handy-spanner:9999']
+- name: 'golang:1.11.13-stretch'
+  entrypoint: 'go'
+  args: ['test', '-v', './...']
+  env:
+    - 'GO111MODULE=on'
+    - 'SPANNER_EMULATOR_HOST=handy-spanner:9999'
+- name: 'golang:1.11.13-stretch'
   entrypoint: 'go'
   args: ['build', '.']
   env: ['GO111MODULE=on']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '--tag=gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA', '.']
-- name: 'gcr.io/cloud-builders/docker'
-  args: ["push", "gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA"]
 - name: 'gcr.io/cloud-builders/kubectl'
   args:
     - set
