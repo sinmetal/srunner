@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"go.opencensus.io/trace"
 	"hash/crc32"
 	"time"
 
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"go.opencensus.io/trace"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 )
