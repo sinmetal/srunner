@@ -24,7 +24,7 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					ctx := context.Background()
 					id := uuid.New().String()
 
-					ctx, span := startSpan(ctx, "/go/insertTweet")
+					ctx, span := startSpan(ctx, "go/insertTweet")
 					defer span.End()
 
 					defer func(n time.Time) {
@@ -71,7 +71,7 @@ func goInsertTweetBenchmark(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer wg.Done()
 
 					ctx := context.Background()
-					ctx, span := startSpan(ctx, "/go/insertTweetBenchmark")
+					ctx, span := startSpan(ctx, "go/insertTweetBenchmark")
 					defer span.End()
 
 					id := uuid.New().String()
@@ -103,7 +103,7 @@ func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer wg.Done()
 
 					f := func(id string) {
-						ctx, span := startSpan(ctx, "/go/updateTweet")
+						ctx, span := startSpan(ctx, "go/updateTweet")
 						defer span.End()
 
 						defer func(n time.Time) {
@@ -146,14 +146,14 @@ func goGetExitsTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer wg.Done()
 					ctx := context.Background()
 
-					ids, err := ts.QueryResultStruct(ctx)
+					ids, err := ts.QueryResultStruct(ctx, 10)
 					if err != nil {
 						endCh <- err
 					}
 					for _, id := range ids {
 						id := id
 						f := func(id string) {
-							ctx, span := startSpan(ctx, "/go/getExitsTweet")
+							ctx, span := startSpan(ctx, "go/getExitsTweet")
 							defer span.End()
 
 							defer func(n time.Time) {
@@ -196,7 +196,7 @@ func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				go func(i int) {
 					defer wg.Done()
 					ctx := context.Background()
-					ctx, span := startSpan(ctx, "/go/getNotFoundTweet")
+					ctx, span := startSpan(ctx, "go/getNotFoundTweet")
 					defer span.End()
 
 					id := uuid.New().String()
@@ -237,7 +237,7 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer wg.Done()
 
 					ctx := context.Background()
-					ctx, span := startSpan(ctx, "/go/goGetTweet3Tables")
+					ctx, span := startSpan(ctx, "go/goGetTweet3Tables")
 					defer span.End()
 
 					defer func(n time.Time) {
