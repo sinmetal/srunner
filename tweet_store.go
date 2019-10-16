@@ -25,7 +25,7 @@ type TweetStore interface {
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
 	QueryHeavy(ctx context.Context) ([]*Tweet, error)
 	QueryAll(ctx context.Context) (int, error)
-	QueryResultStruct(ctx context.Context) ([]*TweetIDAndAuthor, error)
+	QueryResultStruct(ctx context.Context, limit int) ([]*TweetIDAndAuthor, error)
 }
 
 var tweetStore TweetStore
@@ -65,7 +65,7 @@ func (s *defaultTweetStore) TableName() string {
 
 // Insert is Insert to Tweet
 func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) error {
-	ctx, span := startSpan(ctx, "/tweet/insert")
+	ctx, span := startSpan(ctx, "tweet/insert")
 	defer span.End()
 
 	m, err := spanner.InsertStruct(s.TableName(), tweet)
@@ -85,7 +85,7 @@ func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) error {
 }
 
 func (s *defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, error) {
-	ctx, span := startSpan(ctx, "/tweet/get")
+	ctx, span := startSpan(ctx, "tweet/get")
 	defer span.End()
 
 	row, err := s.sc.Single().ReadRow(ctx, s.TableName(), key, []string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"})
@@ -174,7 +174,7 @@ func (s *defaultTweetStore) GetTweet3Tables(ctx context.Context, key spanner.Key
 
 // Query is Tweet を sort_ascで取得する
 func (s *defaultTweetStore) Query(ctx context.Context, limit int) ([]*Tweet, error) {
-	ctx, span := startSpan(ctx, "/tweet/query")
+	ctx, span := startSpan(ctx, "tweet/query")
 	defer span.End()
 
 	iter := s.sc.Single().ReadUsingIndex(ctx, s.TableName(), "TweetSortAsc", spanner.AllKeys(), []string{"Id", "Sort"})
@@ -206,7 +206,7 @@ func (s *defaultTweetStore) Query(ctx context.Context, limit int) ([]*Tweet, err
 }
 
 func (s *defaultTweetStore) QueryHeavy(ctx context.Context) ([]*Tweet, error) {
-	ctx, span := startSpan(ctx, "/tweet/queryHeavy")
+	ctx, span := startSpan(ctx, "tweet/queryHeavy")
 	defer span.End()
 
 	iter := s.sc.Single().Query(ctx, spanner.NewStatement("SELECT * FROM Tweet WHERE Content Like  '%Hoge%' LIMIT 100"))
@@ -236,7 +236,7 @@ func (s *defaultTweetStore) QueryHeavy(ctx context.Context) ([]*Tweet, error) {
 
 // QueryAll is 全件ひたすら取得して、件数を返す
 func (s *defaultTweetStore) QueryAll(ctx context.Context) (int, error) {
-	ctx, span := startSpan(ctx, "/tweet/queryAll")
+	ctx, span := startSpan(ctx, "tweet/queryAll")
 	defer span.End()
 
 	iter := s.sc.Single().WithTimestampBound(spanner.ReadTimestamp(time.Now())).Query(ctx, spanner.NewStatement("SELECT * FROM Tweet"))
@@ -269,11 +269,13 @@ type TweetIDAndAuthor struct {
 }
 
 // QueryResultStruct is StructをResultで返すQueryのサンプル
-func (s *defaultTweetStore) QueryResultStruct(ctx context.Context) ([]*TweetIDAndAuthor, error) {
-	ctx, span := startSpan(ctx, "/tweet/queryResultStruct")
+func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, limit int) ([]*TweetIDAndAuthor, error) {
+	ctx, span := startSpan(ctx, "tweet/queryResultStruct")
 	defer span.End()
 
-	iter := s.sc.Single().Query(ctx, spanner.NewStatement("SELECT ARRAY(SELECT STRUCT(Id, Author)) As IdWithAuthor FROM Tweet LIMIT 10;"))
+	st := spanner.NewStatement("SELECT ARRAY(SELECT STRUCT(Id, Author)) As IdWithAuthor FROM Tweet LIMIT @LIMIT;")
+	st.Params["LIMIT"] = limit
+	iter := s.sc.Single().Query(ctx, st)
 	defer iter.Stop()
 
 	type Result struct {
@@ -301,7 +303,7 @@ func (s *defaultTweetStore) QueryResultStruct(ctx context.Context) ([]*TweetIDAn
 }
 
 func (s *defaultTweetStore) Update(ctx context.Context, id string) error {
-	ctx, span := startSpan(ctx, "/tweet/update")
+	ctx, span := startSpan(ctx, "tweet/update")
 	defer span.End()
 
 	_, err := s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
@@ -327,7 +329,7 @@ func (s *defaultTweetStore) Update(ctx context.Context, id string) error {
 
 // InsertBench is 複数TableへのInsertを行う
 func (s *defaultTweetStore) InsertBench(ctx context.Context, id string) error {
-	ctx, span := startSpan(ctx, "/tweet/insertbench")
+	ctx, span := startSpan(ctx, "tweet/insertbench")
 	defer span.End()
 
 	ml := []*spanner.Mutation{}

@@ -24,7 +24,7 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					ctx := context.Background()
 					id := uuid.New().String()
 
-					ctx, span := startSpan(ctx, "/go/insertTweet")
+					ctx, span := startSpan(ctx, "go/insertTweet")
 					defer span.End()
 
 					defer func(n time.Time) {
@@ -69,7 +69,11 @@ func goInsertTweetBenchmark(ts TweetStore, goroutine int, endCh chan<- error) {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
+
 					ctx := context.Background()
+					ctx, span := startSpan(ctx, "go/insertTweetBenchmark")
+					defer span.End()
+
 					id := uuid.New().String()
 					if err := ts.InsertBench(ctx, id); err != nil {
 						endCh <- err
@@ -85,44 +89,46 @@ func goInsertTweetBenchmark(ts TweetStore, goroutine int, endCh chan<- error) {
 func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
+			ctx := context.Background()
+			ids, err := ts.QueryResultStruct(ctx, goroutine)
+			if err != nil {
+				endCh <- err
+			}
+
 			var wg sync.WaitGroup
 			for i := 0; i < goroutine; i++ {
 				wg.Add(1)
+				i := i
 				go func(i int) {
 					defer wg.Done()
-					ctx := context.Background()
-					ids, err := ts.QueryResultStruct(ctx)
-					if err != nil {
-						endCh <- err
-					}
-					for _, id := range ids {
-						id := id
-						f := func(id string) {
-							ctx, span := startSpan(ctx, "/go/updateTweet")
-							defer span.End()
 
-							defer func(n time.Time) {
-								fmt.Printf("GoRoutine:%d id:%s goUpdateTweet_time: %v\n", i, id, time.Since(n))
-							}(time.Now())
+					f := func(id string) {
+						ctx, span := startSpan(ctx, "go/updateTweet")
+						defer span.End()
 
-							var cancel context.CancelFunc
-							if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-								ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
-								defer cancel()
-							}
+						defer func(n time.Time) {
+							fmt.Printf("GoRoutine:%d id:%s goUpdateTweet_time: %v\n", i, id, time.Since(n))
+						}(time.Now())
 
-							if err := ts.Update(ctx, id); err != nil {
-								ecode := spanner.ErrCode(err)
-								if ecode == codes.NotFound {
-									fmt.Printf("TWEET NOTFOUND ID = %s, i = %d\n", id, i)
-									return
-								}
-								endCh <- err
-							}
-							fmt.Printf("TWEET_UPDATE ID = %s, i = %d\n", id, i)
+						var cancel context.CancelFunc
+						if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+							ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
+							defer cancel()
 						}
-						f(id.ID)
+
+						if err := ts.Update(ctx, id); err != nil {
+							ecode := spanner.ErrCode(err)
+							if ecode == codes.NotFound {
+								fmt.Printf("TWEET NOTFOUND ID = %s, i = %d\n", id, i)
+								return
+							}
+							endCh <- err
+						}
+						fmt.Printf("TWEET_UPDATE ID = %s, i = %d\n", id, i)
 					}
+
+					id := ids[i]
+					f(id.ID)
 				}(i)
 			}
 			wg.Wait()
@@ -140,14 +146,14 @@ func goGetExitsTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer wg.Done()
 					ctx := context.Background()
 
-					ids, err := ts.QueryResultStruct(ctx)
+					ids, err := ts.QueryResultStruct(ctx, 10)
 					if err != nil {
 						endCh <- err
 					}
 					for _, id := range ids {
 						id := id
 						f := func(id string) {
-							ctx, span := startSpan(ctx, "/go/getExitsTweet")
+							ctx, span := startSpan(ctx, "go/getExitsTweet")
 							defer span.End()
 
 							defer func(n time.Time) {
@@ -190,7 +196,7 @@ func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				go func(i int) {
 					defer wg.Done()
 					ctx := context.Background()
-					ctx, span := startSpan(ctx, "/go/getNotFoundTweet")
+					ctx, span := startSpan(ctx, "go/getNotFoundTweet")
 					defer span.End()
 
 					id := uuid.New().String()
@@ -231,7 +237,7 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 					defer wg.Done()
 
 					ctx := context.Background()
-					ctx, span := startSpan(ctx, "/go/goGetTweet3Tables")
+					ctx, span := startSpan(ctx, "go/goGetTweet3Tables")
 					defer span.End()
 
 					defer func(n time.Time) {
