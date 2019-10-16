@@ -24,7 +24,4 @@ steps:
   env:
     - 'CLOUDSDK_COMPUTE_ZONE=asia-northeast1-b'
     - 'CLOUDSDK_CONTAINER_CLUSTER=sinmetal-tokyo'
-  # for cloud-build-local
-- name: gcr.io/cloud-builders/docker
-  args: ['rm', '--force', 'handy-spanner']
 images: ['gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA']
