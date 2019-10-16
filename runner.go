@@ -57,7 +57,6 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
-			sleep()
 		}
 	}()
 }
@@ -79,7 +78,6 @@ func goInsertTweetBenchmark(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
-			sleep()
 		}
 	}()
 }
@@ -128,7 +126,6 @@ func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
-			sleep()
 		}
 	}()
 }
@@ -180,7 +177,6 @@ func goGetExitsTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
-			sleep()
 		}
 	}()
 }
@@ -220,72 +216,6 @@ func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
-			sleep()
-		}
-	}()
-}
-
-func goQueryHeavyTweet(ts TweetStore, goroutine int, endCh chan<- error) {
-	go func() {
-		for {
-			var wg sync.WaitGroup
-			for i := 0; i < goroutine; i++ {
-				wg.Add(1)
-				go func(i int) {
-					defer wg.Done()
-					ctx := context.Background()
-					ctx, span := startSpan(ctx, "/go/queryHeavyTweet")
-					defer span.End()
-
-					fmt.Printf("GoRoutine:%d Start goQueryHeavyTweet_time: 5000ms\n", i)
-					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d goQueryHeavyTweet_time: %v\n", i, time.Since(n))
-					}(time.Now())
-
-					_, err := ts.QueryHeavy(ctx)
-					if err != nil {
-						ecode := spanner.ErrCode(err)
-						if ecode != codes.NotFound {
-							endCh <- err
-						}
-					}
-				}(i)
-			}
-			wg.Wait()
-			sleepLong()
-		}
-	}()
-}
-
-func goQueryAllTweet(ts TweetStore, goroutine int, endCh chan<- error) {
-	go func() {
-		for {
-			var wg sync.WaitGroup
-			for i := 0; i < goroutine; i++ {
-				wg.Add(1)
-				go func(i int) {
-					defer wg.Done()
-					ctx := context.Background()
-					ctx, span := startSpan(ctx, "/go/queryAllTweet")
-					defer span.End()
-
-					fmt.Printf("GoRoutine:%d Start goQueryAllTweet_time: 5000ms\n", i)
-					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d goQueryAllTweet_time: %v\n", i, time.Since(n))
-					}(time.Now())
-
-					count, err := ts.QueryAll(ctx)
-					if err != nil {
-						ecode := spanner.ErrCode(err)
-						if ecode != codes.NotFound {
-							endCh <- err
-						}
-					}
-					fmt.Printf("goQueryAllTweet: %d\n", count)
-				}(i)
-			}
-			wg.Wait()
-			sleepLong()
 		}
 	}()
 }
@@ -324,15 +254,10 @@ func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
 				}(i)
 			}
 			wg.Wait()
-			sleep()
 		}
 	}()
 }
 
 func sleep() {
 	time.Sleep((time.Duration(300) + time.Duration(rand.Intn(300))) * time.Millisecond)
-}
-
-func sleepLong() {
-	time.Sleep((time.Duration(100) + time.Duration(rand.Intn(30))) * time.Minute)
 }
