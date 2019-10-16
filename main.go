@@ -20,6 +20,7 @@ const Service = "srunner"
 type EnvConfig struct {
 	SpannerDatabase string `required:"true"`
 	Goroutine       int    `default:"3"`
+	TracePrefix     string `default:"default"`
 }
 
 func main() {
@@ -28,6 +29,8 @@ func main() {
 		log.Fatal(err.Error())
 	}
 	log.Printf("ENV_CONFIG %+v\n", env)
+
+	tracePrefix = env.TracePrefix
 
 	project, err := gcpmetadata.GetProjectID()
 	if err != nil {
