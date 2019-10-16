@@ -69,7 +69,11 @@ func goInsertTweetBenchmark(ts TweetStore, goroutine int, endCh chan<- error) {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
+
 					ctx := context.Background()
+					ctx, span := startSpan(ctx, "/go/insertTweetBenchmark")
+					defer span.End()
+
 					id := uuid.New().String()
 					if err := ts.InsertBench(ctx, id); err != nil {
 						endCh <- err
