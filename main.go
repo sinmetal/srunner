@@ -9,6 +9,7 @@ import (
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sinmetal/gcpmetadata"
+	"github.com/sinmetal/srunner/tweet"
 	"go.opencensus.io/trace"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -67,7 +68,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	ts := NewTweetStore(sc)
+	ts := tweet.NewTweetStore(sc)
 
 	endCh := make(chan error, 10)
 

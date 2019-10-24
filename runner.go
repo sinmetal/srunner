@@ -10,10 +10,11 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
+	"github.com/sinmetal/srunner/tweet"
 	"google.golang.org/grpc/codes"
 )
 
-func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
+func goInsertTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
 			var wg sync.WaitGroup
@@ -40,7 +41,7 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 					now := time.Now()
 					shardId := crc32.ChecksumIEEE([]byte(now.String())) % 10
 
-					if err := ts.Insert(ctx, &Tweet{
+					if err := ts.Insert(ctx, &tweet.Tweet{
 						ID:             id,
 						Author:         getAuthor(),
 						Content:        uuid.New().String(),
@@ -61,7 +62,7 @@ func goInsertTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 	}()
 }
 
-func goInsertTweetBenchmark(ts TweetStore, goroutine int, endCh chan<- error) {
+func goInsertTweetBenchmark(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
 			var wg sync.WaitGroup
@@ -86,7 +87,7 @@ func goInsertTweetBenchmark(ts TweetStore, goroutine int, endCh chan<- error) {
 	}()
 }
 
-func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
+func goUpdateTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
 			ctx := context.Background()
@@ -136,7 +137,7 @@ func goUpdateTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 	}()
 }
 
-func goGetExitsTweet(ts TweetStore, goroutine int, endCh chan<- error) {
+func goGetExitsTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
 			var wg sync.WaitGroup
@@ -187,7 +188,7 @@ func goGetExitsTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 	}()
 }
 
-func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
+func goGetNotFoundTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
 			var wg sync.WaitGroup
@@ -226,7 +227,7 @@ func goGetNotFoundTweet(ts TweetStore, goroutine int, endCh chan<- error) {
 	}()
 }
 
-func goGetTweet3Tables(ts TweetStore, goroutine int, endCh chan<- error) {
+func goGetTweet3Tables(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
 			var wg sync.WaitGroup
