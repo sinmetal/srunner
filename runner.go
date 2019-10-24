@@ -95,6 +95,11 @@ func goUpdateTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 			if err != nil {
 				endCh <- err
 			}
+			if len(ids) < goroutine {
+				// 最初はTableが空っぽでUPDATE対象のRowが取れないので、INSERTが走るまで少し待つ
+				time.Sleep(5 * time.Minute)
+				continue
+			}
 
 			var wg sync.WaitGroup
 			for i := 0; i < goroutine; i++ {
@@ -263,8 +268,4 @@ func goGetTweet3Tables(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 			wg.Wait()
 		}
 	}()
-}
-
-func sleep() {
-	time.Sleep((time.Duration(300) + time.Duration(rand.Intn(300))) * time.Millisecond)
 }
