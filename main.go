@@ -10,6 +10,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sinmetal/gcpmetadata"
 	"github.com/sinmetal/srunner/tweet"
+	"github.com/sinmetal/stats"
 	"go.opencensus.io/trace"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -47,6 +48,12 @@ func main() {
 		}
 		trace.RegisterExporter(exporter)
 		// trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+	}
+	{
+		exporter := stats.InitExporter(project)
+		if err := stats.InitOpenCensusStats(exporter); err != nil {
+			panic(err)
+		}
 	}
 
 	ctx := context.Background()
