@@ -10,7 +10,9 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
+	"github.com/morikuni/failure"
 	"github.com/sinmetal/srunner/tweet"
+	"github.com/sinmetal/stats"
 	"google.golang.org/grpc/codes"
 )
 
@@ -28,33 +30,50 @@ func goInsertTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 					ctx, span := startSpan(ctx, "go/insertTweet")
 					defer span.End()
 
-					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d id:%s goInsertTweet_time: %v\n", i, id, time.Since(n))
-					}(time.Now())
-
 					var cancel context.CancelFunc
 					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-						ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
+						ctx, cancel = context.WithTimeout(ctx, 800*time.Millisecond)
 						defer cancel()
 					}
 
 					now := time.Now()
 					shardId := crc32.ChecksumIEEE([]byte(now.String())) % 10
 
-					if err := ts.Insert(ctx, &tweet.Tweet{
-						ID:             id,
-						Author:         getAuthor(),
-						Content:        uuid.New().String(),
-						Favos:          getAuthors(),
-						Sort:           rand.Int63n(100000000),
-						ShardCreatedAt: int64(shardId),
-						CreatedAt:      now,
-						UpdatedAt:      now,
-						CommitedAt:     spanner.CommitTimestamp,
-					}); err != nil {
-						endCh <- err
+					retCh := make(chan error, 1)
+					go func() {
+						retCh <- ts.Insert(ctx, &tweet.Tweet{
+							ID:             id,
+							Author:         getAuthor(),
+							Content:        uuid.New().String(),
+							Favos:          getAuthors(),
+							Sort:           rand.Int63n(100000000),
+							ShardCreatedAt: int64(shardId),
+							CreatedAt:      now,
+							UpdatedAt:      now,
+							CommitedAt:     spanner.CommitTimestamp,
+						})
+					}()
+					select {
+					case <-ctx.Done():
+						if err := stats.CountSpannerStatus(ctx, "INSERT TIMEOUT"); err != nil {
+							endCh <- err
+						}
+					case err := <-retCh:
+						if err != nil {
+							serr := stats.CountSpannerStatus(ctx, "INSERT NG")
+							if serr != nil {
+								err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
+							}
+							if err != nil {
+								endCh <- err
+							}
+							fmt.Printf("TWEET_INSERT ID = %s, i = %d\n", id, i)
+						} else {
+							if err := stats.CountSpannerStatus(ctx, "INSERT OK"); err != nil {
+								endCh <- err
+							}
+						}
 					}
-					fmt.Printf("TWEET_INSERT ID = %s, i = %d\n", id, i)
 				}(i)
 			}
 			wg.Wait()
