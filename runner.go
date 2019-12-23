@@ -131,25 +131,43 @@ func goUpdateTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 						ctx, span := startSpan(ctx, "go/updateTweet")
 						defer span.End()
 
-						defer func(n time.Time) {
-							fmt.Printf("GoRoutine:%d id:%s goUpdateTweet_time: %v\n", i, id, time.Since(n))
-						}(time.Now())
-
 						var cancel context.CancelFunc
 						if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-							ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
+							ctx, cancel = context.WithTimeout(ctx, 800*time.Millisecond)
 							defer cancel()
 						}
 
-						if err := ts.Update(ctx, id); err != nil {
-							ecode := spanner.ErrCode(err)
-							if ecode == codes.NotFound {
-								fmt.Printf("TWEET NOTFOUND ID = %s, i = %d\n", id, i)
-								return
+						retCh := make(chan error, 1)
+						go func() {
+							retCh <- ts.Update(ctx, id)
+						}()
+						select {
+						case <-ctx.Done():
+							if err := stats.CountSpannerStatus(ctx, "UPDATE TIMEOUT"); err != nil {
+								endCh <- err
 							}
-							endCh <- err
+						case err := <-retCh:
+							if err != nil {
+								ecode := spanner.ErrCode(err)
+								if ecode == codes.NotFound {
+									fmt.Printf("TWEET NOTFOUND ID = %s, i = %d\n", id, i)
+									return
+								}
+
+								serr := stats.CountSpannerStatus(ctx, "UPDATE NG")
+								if serr != nil {
+									err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
+								}
+								if err != nil {
+									endCh <- err
+								}
+								fmt.Printf("TWEET_UPDATE ID = %s, i = %d\n", id, i)
+							} else {
+								if err := stats.CountSpannerStatus(ctx, "UPDATE OK"); err != nil {
+									endCh <- err
+								}
+							}
 						}
-						fmt.Printf("TWEET_UPDATE ID = %s, i = %d\n", id, i)
 					}
 
 					id := ids[i]
@@ -181,25 +199,45 @@ func goGetExitsTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 							ctx, span := startSpan(ctx, "go/getExitsTweet")
 							defer span.End()
 
-							defer func(n time.Time) {
-								fmt.Printf("GoRoutine:%d id:%s goGetExitsTweet_time: %v\n", i, id, time.Since(n))
-							}(time.Now())
-
 							var cancel context.CancelFunc
 							if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-								ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
+								ctx, cancel = context.WithTimeout(ctx, 800*time.Millisecond)
 								defer cancel()
 							}
 
-							key := spanner.Key{id}
-							_, err := ts.Get(ctx, key)
-							if err != nil {
-								ecode := spanner.ErrCode(err)
-								if ecode == codes.NotFound {
-									fmt.Printf("TWEET %s is NOT FOUND !?", id)
-									return
+							retCh := make(chan error, 1)
+							go func(id string) {
+								key := spanner.Key{id}
+								_, err := ts.Get(ctx, key)
+								retCh <- err
+							}(id)
+							select {
+							case <-ctx.Done():
+								if err := stats.CountSpannerStatus(ctx, "GET_EXISTS TIMEOUT"); err != nil {
+									endCh <- err
 								}
-								endCh <- err
+							case err := <-retCh:
+								if err != nil {
+									if err != nil {
+										ecode := spanner.ErrCode(err)
+										if ecode == codes.NotFound {
+											fmt.Printf("TWEET %s is NOT FOUND !?", id)
+											return
+										}
+									}
+
+									serr := stats.CountSpannerStatus(ctx, "GET_EXISTS NG")
+									if serr != nil {
+										err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
+									}
+									if err != nil {
+										endCh <- err
+									}
+								} else {
+									if err := stats.CountSpannerStatus(ctx, "GET_EXISTS OK"); err != nil {
+										endCh <- err
+									}
+								}
 							}
 						}
 						f(id.ID)
@@ -226,22 +264,40 @@ func goGetNotFoundTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) 
 
 					id := uuid.New().String()
 
-					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d id:%s goGetNotFoundTweet_time: %v\n", i, id, time.Since(n))
-					}(time.Now())
-
 					var cancel context.CancelFunc
 					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-						ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
+						ctx, cancel = context.WithTimeout(ctx, 800*time.Millisecond)
 						defer cancel()
 					}
 
-					key := spanner.Key{id}
-					_, err := ts.Get(ctx, key)
-					if err != nil {
-						ecode := spanner.ErrCode(err)
-						if ecode != codes.NotFound {
+					retCh := make(chan error, 1)
+					go func(id string) {
+						key := spanner.Key{id}
+						_, err := ts.Get(ctx, key)
+						retCh <- err
+					}(id)
+					select {
+					case <-ctx.Done():
+						if err := stats.CountSpannerStatus(ctx, "GET_NOT_FOUND TIMEOUT"); err != nil {
 							endCh <- err
+						}
+					case err := <-retCh:
+						if err != nil {
+							ecode := spanner.ErrCode(err)
+							if ecode == codes.NotFound {
+								if err := stats.CountSpannerStatus(ctx, "GET_NOT_FOUND OK"); err != nil {
+									endCh <- err
+								}
+								return
+							}
+
+							serr := stats.CountSpannerStatus(ctx, "GET_NOT_FOUND NG")
+							if serr != nil {
+								err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
+							}
+							if err != nil {
+								endCh <- err
+							}
 						}
 					}
 				}(i)
@@ -264,10 +320,6 @@ func goGetTweet3Tables(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 					ctx := context.Background()
 					ctx, span := startSpan(ctx, "go/goGetTweet3Tables")
 					defer span.End()
-
-					defer func(n time.Time) {
-						fmt.Printf("GoRoutine:%d goGetTweet3Tables_time: %v\n", i, time.Since(n))
-					}(time.Now())
 
 					var cancel context.CancelFunc
 					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
