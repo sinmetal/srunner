@@ -124,8 +124,7 @@ func goInsertTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 						return "", ts.Insert(ctx, t)
 					})
 
-					g.Go(func() (interface{}, error) {
-						time.Sleep(150 * time.Millisecond)
+					g.Delay(150*time.Millisecond, func() (interface{}, error) {
 						return "", ts.Insert(ctx, t)
 					})
 
@@ -293,8 +292,7 @@ func goUpdateTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 							return "", ts.Update(ctx, id)
 						})
 
-						g.Go(func() (interface{}, error) {
-							time.Sleep(150 * time.Millisecond)
+						g.Delay(150*time.Millisecond, func() (interface{}, error) {
 							return "", ts.Update(ctx, id)
 						})
 
@@ -319,9 +317,7 @@ func goUpdateTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 							if serr != nil {
 								err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
 							}
-							if err != nil {
-								endCh <- err
-							}
+							endCh <- err
 						} else {
 							if err := stats.CountSpannerStatus(context.Background(), "UPDATE_FCFS OK"); err != nil {
 								endCh <- err
@@ -441,8 +437,7 @@ func goGetExitsTweetFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- error)
 								return ts.Get(ctx, key)
 							})
 
-							g.Go(func() (interface{}, error) {
-								time.Sleep(150 * time.Millisecond)
+							g.Delay(150*time.Millisecond, func() (interface{}, error) {
 								return ts.Get(ctx, key)
 							})
 
@@ -568,8 +563,7 @@ func goGetNotFoundTweetFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- err
 						return ts.Get(ctx, key)
 					})
 
-					g.Go(func() (interface{}, error) {
-						time.Sleep(150 * time.Millisecond)
+					g.Delay(150*time.Millisecond, func() (interface{}, error) {
 						return ts.Get(ctx, key)
 					})
 
