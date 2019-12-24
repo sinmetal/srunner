@@ -13,6 +13,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/sinmetal/gcpmetadata v0.0.0-20190821070455-586c749ee86c
 	github.com/sinmetal/stats v0.0.0-20191219083750-c350468745f5 // indirect
+	github.com/tenntenn/sync v0.0.0-20180624231837-38c46c280d9d // indirect
 	go.opencensus.io v0.22.2
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	google.golang.org/api v0.11.0

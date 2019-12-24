@@ -80,6 +80,8 @@ github.com/sinmetal/stats v0.0.0-20191219083750-c350468745f5/go.mod h1:DCiGIhkWN
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
+github.com/tenntenn/sync v0.0.0-20180624231837-38c46c280d9d h1:DXv4VW8xYaL5ZrsKNzR6YQO/cxP6ouVH8TXQ4McxSBs=
+github.com/tenntenn/sync v0.0.0-20180624231837-38c46c280d9d/go.mod h1:PeoKqHegabwGOFFqq/uqIH3+g02uwQMiHKf4UaOD5TU=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.1 h1:8dP3SGL7MPB94crU3bEPplMPe83FI4EouesJUeFHv50=

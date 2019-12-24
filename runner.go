@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hash/crc32"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -13,8 +15,11 @@ import (
 	"github.com/morikuni/failure"
 	"github.com/sinmetal/srunner/tweet"
 	"github.com/sinmetal/stats"
+	"github.com/tenntenn/sync/fcfs"
 	"google.golang.org/grpc/codes"
 )
+
+var Timeout failure.StringCode = "TIMEOUT"
 
 func goInsertTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
@@ -73,6 +78,81 @@ func goInsertTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 								endCh <- err
 							}
 						}
+					}
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
+
+func goInsertTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+					ctx := context.Background()
+					id := uuid.New().String()
+
+					ctx, span := startSpan(ctx, "go/insertTweetWithFCFS")
+					defer span.End()
+
+					var cancel context.CancelFunc
+					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+						ctx, cancel = context.WithTimeout(ctx, 800*time.Millisecond)
+						defer cancel()
+					}
+
+					now := time.Now()
+					shardId := crc32.ChecksumIEEE([]byte(now.String())) % 10
+
+					t := &tweet.Tweet{
+						ID:             id,
+						Author:         getAuthor(),
+						Content:        uuid.New().String(),
+						Favos:          getAuthors(),
+						Sort:           rand.Int63n(100000000),
+						ShardCreatedAt: int64(shardId),
+						CreatedAt:      now,
+						UpdatedAt:      now,
+						CommitedAt:     spanner.CommitTimestamp,
+					}
+
+					var g fcfs.Group
+					g.Go(func() (interface{}, error) {
+						return "", ts.Insert(ctx, t)
+					})
+
+					g.Go(func() (interface{}, error) {
+						return "", ts.Insert(ctx, t)
+					})
+
+					g.Go(func() (interface{}, error) {
+						<-ctx.Done()
+						return "", failure.New(Timeout)
+					})
+
+					_, err := g.Wait()
+					if failure.Is(err, Timeout) {
+						fmt.Printf("TWEET_INSERT_TIMEOUT ID = %s, i = %d\n", id, i)
+						if err := stats.CountSpannerStatus(ctx, "INSERT TIMEOUT"); err != nil {
+							endCh <- err
+						}
+					} else if err != nil {
+						fmt.Printf("TWEET_INSERT_NG ID = %s, i = %d\n", id, i)
+						serr := stats.CountSpannerStatus(ctx, "INSERT NG")
+						if serr != nil {
+							err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
+						}
+						if err != nil {
+							endCh <- err
+						}
+					}
+					if err := stats.CountSpannerStatus(ctx, "INSERT OK"); err != nil {
+						endCh <- err
 					}
 				}(i)
 			}
