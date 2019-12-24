@@ -55,6 +55,7 @@ func goInsertTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 					}()
 					select {
 					case <-ctx.Done():
+						fmt.Printf("TWEET_INSERT_TIMEOUT ID = %s, i = %d\n", id, i)
 						if err := stats.CountSpannerStatus(ctx, "INSERT TIMEOUT"); err != nil {
 							endCh <- err
 						}
@@ -67,7 +68,6 @@ func goInsertTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 							if err != nil {
 								endCh <- err
 							}
-							fmt.Printf("TWEET_INSERT ID = %s, i = %d\n", id, i)
 						} else {
 							if err := stats.CountSpannerStatus(ctx, "INSERT OK"); err != nil {
 								endCh <- err
