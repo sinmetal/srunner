@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"hash/crc32"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -138,12 +136,12 @@ func goInsertTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 					_, err := g.Wait()
 					if failure.Is(err, Timeout) {
 						fmt.Printf("TWEET_INSERT_TIMEOUT ID = %s, i = %d\n", id, i)
-						if err := stats.CountSpannerStatus(ctx, "INSERT TIMEOUT"); err != nil {
+						if err := stats.CountSpannerStatus(ctx, "INSERT_FCFS TIMEOUT"); err != nil {
 							endCh <- err
 						}
 					} else if err != nil {
 						fmt.Printf("TWEET_INSERT_NG ID = %s, i = %d\n", id, i)
-						serr := stats.CountSpannerStatus(ctx, "INSERT NG")
+						serr := stats.CountSpannerStatus(ctx, "INSERT_FCFS NG")
 						if serr != nil {
 							err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
 						}
@@ -151,7 +149,7 @@ func goInsertTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 							endCh <- err
 						}
 					}
-					if err := stats.CountSpannerStatus(ctx, "INSERT OK"); err != nil {
+					if err := stats.CountSpannerStatus(ctx, "INSERT_FCFS OK"); err != nil {
 						endCh <- err
 					}
 				}(i)
@@ -241,12 +239,90 @@ func goUpdateTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 								if err != nil {
 									endCh <- err
 								}
-								fmt.Printf("TWEET_UPDATE ID = %s, i = %d\n", id, i)
 							} else {
 								if err := stats.CountSpannerStatus(ctx, "UPDATE OK"); err != nil {
 									endCh <- err
 								}
 							}
+						}
+					}
+
+					id := ids[i]
+					f(id.ID)
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
+
+func goUpdateTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			ctx := context.Background()
+			ids, err := ts.QueryResultStruct(ctx, goroutine)
+			if err != nil {
+				endCh <- err
+			}
+			if len(ids) < goroutine {
+				// 最初はTableが空っぽでUPDATE対象のRowが取れないので、INSERTが走るまで少し待つ
+				time.Sleep(5 * time.Minute)
+				continue
+			}
+
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				i := i
+				go func(i int) {
+					defer wg.Done()
+
+					f := func(id string) {
+						ctx, span := startSpan(ctx, "go/updateTweetWithFCFS")
+						defer span.End()
+
+						var cancel context.CancelFunc
+						if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+							ctx, cancel = context.WithTimeout(ctx, 800*time.Millisecond)
+							defer cancel()
+						}
+
+						var g fcfs.Group
+						g.Go(func() (interface{}, error) {
+							return "", ts.Update(ctx, id)
+						})
+
+						g.Go(func() (interface{}, error) {
+							return "", ts.Update(ctx, id)
+						})
+
+						g.Go(func() (interface{}, error) {
+							<-ctx.Done()
+							return "", failure.New(Timeout)
+						})
+
+						_, err := g.Wait()
+						if failure.Is(err, Timeout) {
+							if err := stats.CountSpannerStatus(ctx, "UPDATE_FCFS TIMEOUT"); err != nil {
+								endCh <- err
+							}
+						} else if err != nil {
+							ecode := spanner.ErrCode(err)
+							if ecode == codes.NotFound {
+								fmt.Printf("TWEET NOTFOUND ID = %s, i = %d\n", id, i)
+								return
+							}
+
+							serr := stats.CountSpannerStatus(ctx, "UPDATE_FCFS NG")
+							if serr != nil {
+								err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
+							}
+							if err != nil {
+								endCh <- err
+							}
+						}
+						if err := stats.CountSpannerStatus(ctx, "UPDATE_FCFS OK"); err != nil {
+							endCh <- err
 						}
 					}
 
@@ -330,6 +406,80 @@ func goGetExitsTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	}()
 }
 
+func goGetExitsTweetFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+					ctx := context.Background()
+
+					ids, err := ts.QueryResultStruct(ctx, 10)
+					if err != nil {
+						endCh <- err
+					}
+					for _, id := range ids {
+						id := id
+						f := func(id string) {
+							ctx, span := startSpan(ctx, "go/getExitsTweetWithFCFS")
+							defer span.End()
+
+							var cancel context.CancelFunc
+							if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+								ctx, cancel = context.WithTimeout(ctx, 800*time.Millisecond)
+								defer cancel()
+							}
+
+							key := spanner.Key{id}
+							var g fcfs.Group
+							g.Go(func() (interface{}, error) {
+								return ts.Get(ctx, key)
+							})
+
+							g.Go(func() (interface{}, error) {
+								return ts.Get(ctx, key)
+							})
+
+							g.Go(func() (interface{}, error) {
+								<-ctx.Done()
+								return "", failure.New(Timeout)
+							})
+
+							_, err := g.Wait()
+							if failure.Is(err, Timeout) {
+								if err := stats.CountSpannerStatus(ctx, "GET_EXISTS_FCFS TIMEOUT"); err != nil {
+									endCh <- err
+								}
+							} else if err != nil {
+								ecode := spanner.ErrCode(err)
+								if ecode == codes.NotFound {
+									fmt.Printf("TWEET %s is NOT FOUND !?", id)
+									return
+								}
+								serr := stats.CountSpannerStatus(ctx, "GET_EXISTS_FCFS NG")
+								if serr != nil {
+									err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
+								}
+								if err != nil {
+									endCh <- err
+								}
+							}
+							if err := stats.CountSpannerStatus(ctx, "GET_EXISTS_FCFS OK"); err != nil {
+								endCh <- err
+							}
+						}
+						f(id.ID)
+					}
+
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
+
 func goGetNotFoundTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
@@ -372,6 +522,63 @@ func goGetNotFoundTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) 
 							}
 
 							serr := stats.CountSpannerStatus(ctx, "GET_NOT_FOUND NG")
+							if serr != nil {
+								err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
+							}
+							if err != nil {
+								endCh <- err
+							}
+						}
+					}
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
+
+func goGetNotFoundTweetFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "go/getNotFoundTweetWithFCFS")
+					defer span.End()
+
+					id := uuid.New().String()
+
+					var cancel context.CancelFunc
+					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+						ctx, cancel = context.WithTimeout(ctx, 800*time.Millisecond)
+						defer cancel()
+					}
+
+					retCh := make(chan error, 1)
+					go func(id string) {
+						key := spanner.Key{id}
+						_, err := ts.Get(ctx, key)
+						retCh <- err
+					}(id)
+					select {
+					case <-ctx.Done():
+						if err := stats.CountSpannerStatus(ctx, "GET_NOT_FOUND_FCFS TIMEOUT"); err != nil {
+							endCh <- err
+						}
+					case err := <-retCh:
+						if err != nil {
+							ecode := spanner.ErrCode(err)
+							if ecode == codes.NotFound {
+								if err := stats.CountSpannerStatus(ctx, "GET_NOT_FOUND_FCFS OK"); err != nil {
+									endCh <- err
+								}
+								return
+							}
+
+							serr := stats.CountSpannerStatus(ctx, "GET_NOT_FOUND_FCFS NG")
 							if serr != nil {
 								err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
 							}
