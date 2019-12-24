@@ -80,11 +80,12 @@ func main() {
 	endCh := make(chan error, 10)
 
 	goInsertTweet(ts, env.Goroutine, endCh)
-	goInsertTweetBenchmark(ts, env.Goroutine, endCh)
+	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
+	goInsertTweetWithFCFS(ts, env.Goroutine, endCh)
 	goUpdateTweet(ts, env.Goroutine, endCh)
 	goGetExitsTweet(ts, env.Goroutine, endCh)
 	goGetNotFoundTweet(ts, env.Goroutine, endCh)
-	goGetTweet3Tables(ts, env.Goroutine, endCh)
+	// goGetTweet3Tables(ts, env.Goroutine, endCh)
 
 	err = <-endCh
 	fmt.Printf("BOMB %+v", err)
