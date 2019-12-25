@@ -205,7 +205,8 @@ func goFCFS(ctx context.Context, operation string, id string, i int, f func(ctx 
 	})
 
 	_, err := g.Wait()
-	if failure.Is(err, Timeout) {
+	code, _ := failure.CodeOf(err)
+	if code == Timeout {
 		fmt.Printf("TWEET_%s_TIMEOUT ID = %s, i = %d\n", operation, id, i)
 		if err := stats.CountSpannerStatus(context.Background(), fmt.Sprintf("%s_FCFS TIMEOUT", operation)); err != nil {
 			return err
