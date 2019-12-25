@@ -83,7 +83,7 @@ func main() {
 	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	goInsertTweetWithFCFS(ts, env.Goroutine, endCh)
 	//goUpdateTweet(ts, env.Goroutine, endCh)
-	//goUpdateTweetWithFCFS(ts, env.Goroutine, endCh)
+	goUpdateTweetWithFCFS(ts, env.Goroutine, endCh)
 	//goGetExitsTweet(ts, env.Goroutine, endCh)
 	//goGetExitsTweetFCFS(ts, env.Goroutine, endCh)
 	//goGetNotFoundTweet(ts, env.Goroutine, endCh)
