@@ -94,7 +94,6 @@ func goInsertTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 					defer wg.Done()
 					ctx := context.Background()
 					id := uuid.New().String()
-					fmt.Printf("TWEET_INSERT_TRY %s\n", id)
 
 					ctx, span := startSpan(ctx, "go/insertTweetWithFCFS")
 					defer span.End()
@@ -114,30 +113,40 @@ func goInsertTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 						CommitedAt:     spanner.CommitTimestamp,
 					}
 
+					timeout := 1000 * time.Millisecond
 					var cancel context.CancelFunc
 					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-						ctx, cancel = context.WithTimeout(ctx, 1000*time.Millisecond)
+						ctx, cancel = context.WithTimeout(ctx, timeout)
 						defer cancel()
 					}
 
 					var g fcfs.Group
 					g.Go(func() (interface{}, error) {
-						defer fmt.Println("INSERT 1 END")
+						ctx, span := startSpan(ctx, "insert1")
+						defer span.End()
 						return "", ts.Insert(ctx, t)
 					})
 
-					g.Delay(150*time.Millisecond, func() (interface{}, error) {
-						defer fmt.Println("INSERT 2 END")
-						return "", ts.Insert(ctx, t)
+					g.Delay(250*time.Millisecond, func() (interface{}, error) {
+						select {
+						case <-ctx.Done():
+							return "", nil
+						default:
+							ctx, span := startSpan(ctx, "insert2")
+							defer span.End()
+							err := stats.CountSpannerStatus(context.Background(), "INSERT_FCFS_SECOND START")
+							if err != nil {
+								return "", err
+							}
+							return "", ts.Insert(ctx, t)
+						}
 					})
 
-					g.Delay(1000*time.Millisecond, func() (interface{}, error) {
+					g.Go(func() (interface{}, error) {
 						<-ctx.Done()
-						fmt.Println("context done!!")
 						return "", failure.New(Timeout)
 					})
 
-					fmt.Println("Wait Start")
 					_, err := g.Wait()
 					if failure.Is(err, Timeout) {
 						fmt.Printf("TWEET_INSERT_TIMEOUT ID = %s, i = %d\n", id, i)
@@ -156,11 +165,9 @@ func goInsertTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 						}
 						return
 					}
-					fmt.Printf("TWEET_INSERT_OK ID = %s, i = %d\n", id, i)
 					if err := stats.CountSpannerStatus(context.Background(), "INSERT_FCFS OK"); err != nil {
 						endCh <- err
 					}
-
 				}(i)
 			}
 			wg.Wait()
