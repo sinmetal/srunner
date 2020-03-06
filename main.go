@@ -10,6 +10,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sinmetal/gcpmetadata"
 	"github.com/sinmetal/srunner/tweet"
+	"github.com/sinmetal/stats"
 	"go.opencensus.io/trace"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -48,6 +49,12 @@ func main() {
 		trace.RegisterExporter(exporter)
 		// trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
 	}
+	{
+		exporter := stats.InitExporter(project)
+		if err := stats.InitOpenCensusStats(exporter); err != nil {
+			panic(err)
+		}
+	}
 
 	ctx := context.Background()
 
@@ -72,12 +79,16 @@ func main() {
 
 	endCh := make(chan error, 10)
 
-	goInsertTweet(ts, env.Goroutine, endCh)
-	goInsertTweetBenchmark(ts, env.Goroutine, endCh)
-	goUpdateTweet(ts, env.Goroutine, endCh)
-	goGetExitsTweet(ts, env.Goroutine, endCh)
-	goGetNotFoundTweet(ts, env.Goroutine, endCh)
-	goGetTweet3Tables(ts, env.Goroutine, endCh)
+	// goInsertTweet(ts, env.Goroutine, endCh)
+	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
+	goInsertTweetWithFCFS(ts, env.Goroutine, endCh)
+	//goUpdateTweet(ts, env.Goroutine, endCh)
+	goUpdateTweetWithFCFS(ts, env.Goroutine, endCh)
+	//goGetExitsTweet(ts, env.Goroutine, endCh)
+	//goGetExitsTweetFCFS(ts, env.Goroutine, endCh)
+	//goGetNotFoundTweet(ts, env.Goroutine, endCh)
+	//goGetNotFoundTweetFCFS(ts, env.Goroutine, endCh)
+	// goGetTweet3Tables(ts, env.Goroutine, endCh)
 
 	err = <-endCh
 	fmt.Printf("BOMB %+v", err)
