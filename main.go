@@ -92,6 +92,7 @@ func main() {
 	// goGetTweet3Tables(ts, env.Goroutine, endCh)
 
 	goInsertItemOrder(ias, env.Goroutine, endCh)
+	goInsertItemOrderNOFK(ias, env.Goroutine, endCh)
 
 	err = <-endCh
 	fmt.Printf("BOMB %+v", err)
