@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/sinmetal/srunner/item"
 	"hash/crc32"
 	"math/rand"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"github.com/morikuni/failure"
+	"github.com/sinmetal/srunner/item"
 	"github.com/sinmetal/srunner/tweet"
 	"github.com/sinmetal/stats"
 	"github.com/tenntenn/sync/fcfs"
