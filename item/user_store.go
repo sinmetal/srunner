@@ -2,6 +2,8 @@ package item
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -23,6 +25,10 @@ func NewUserStore(ctx context.Context, sc *spanner.Client) *UserStore {
 
 func (s *UserStore) TableName() string {
 	return "User"
+}
+
+func (s *UserStore) GetRandomID() string {
+	return fmt.Sprintf("%07d", rand.Intn(10000000))
 }
 
 func (s *UserStore) BatchInsertOrUpdate(ctx context.Context, users []*User) error {

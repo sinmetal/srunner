@@ -2,6 +2,8 @@ package item
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -24,6 +26,10 @@ func NewItemMasterStore(ctx context.Context, sc *spanner.Client) *ItemMasterStor
 
 func (s *ItemMasterStore) TableName() string {
 	return "ItemMaster"
+}
+
+func (s *ItemMasterStore) GetRandomID() string {
+	return fmt.Sprintf("%07d", rand.Intn(10000000))
 }
 
 func (s *ItemMasterStore) InsertOrUpdate(ctx context.Context, item *ItemMaster) error {
