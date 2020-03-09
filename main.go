@@ -47,7 +47,7 @@ func main() {
 			panic(err)
 		}
 		trace.RegisterExporter(exporter)
-		trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+		// trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
 	}
 	{
 		exporter := stats.InitExporter(project)
