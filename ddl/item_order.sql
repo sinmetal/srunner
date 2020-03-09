@@ -1,0 +1,8 @@
+CREATE TABLE ItemOrder (
+	ItemOrderID STRING(MAX) NOT NULL,
+	ItemID STRING(MAX) NOT NULL,
+	UserID STRING(MAX) NOT NULL,
+	CommitedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
+	FOREIGN KEY (ItemID) REFERENCES ItemMaster(ItemID),
+	FOREIGN KEY (UserID) REFERENCES User(UserID),
+) PRIMARY KEY (ItemOrderID)
