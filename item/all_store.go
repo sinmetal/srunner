@@ -7,10 +7,11 @@ import (
 )
 
 type AllStore struct {
-	IMS   *ItemMasterStore
-	IOS   *ItemOrderStore
-	IOSFK *ItemOrderNOFKStore
-	US    *UserStore
+	IMS    *ItemMasterStore
+	IOS    *ItemOrderStore
+	IOSFK  *ItemOrderNOFKStore
+	IODFKS *ItemOrderDummyFKStore
+	US     *UserStore
 }
 
 func NewAllStore(ctx context.Context, sc *spanner.Client) *AllStore {
@@ -18,11 +19,13 @@ func NewAllStore(ctx context.Context, sc *spanner.Client) *AllStore {
 	ims := NewItemMasterStore(ctx, sc)
 	ios := NewItemOrderStore(ctx, sc)
 	iosfk := NewItemOrderNOFKStore(ctx, sc)
+	iodfks := NewItemOrderDummyFKStore(ctx, sc)
 
 	return &AllStore{
-		IMS:   ims,
-		IOS:   ios,
-		IOSFK: iosfk,
-		US:    us,
+		IMS:    ims,
+		IOS:    ios,
+		IOSFK:  iosfk,
+		IODFKS: iodfks,
+		US:     us,
 	}
 }
