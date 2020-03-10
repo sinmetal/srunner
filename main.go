@@ -93,6 +93,7 @@ func main() {
 
 	goInsertItemOrder(ias, env.Goroutine, endCh)
 	goInsertItemOrderNOFK(ias, env.Goroutine, endCh)
+	goInsertItemOrderDummyFK(ias, env.Goroutine, endCh)
 
 	err = <-endCh
 	fmt.Printf("BOMB %+v", err)

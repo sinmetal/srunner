@@ -731,3 +731,32 @@ func goInsertItemOrderNOFK(as *item.AllStore, goroutine int, endCh chan<- error)
 		}
 	}()
 }
+
+func goInsertItemOrderDummyFK(as *item.AllStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "go/insertItemOrderDummyFK")
+					defer span.End()
+
+					id := uuid.New().String()
+					if err := as.IODFKS.Insert(ctx, &item.ItemOrderDummyFK{
+						ItemOrderID: id,
+						ItemID:      as.IMS.GetRandomID(),
+						UserID:      as.US.GetRandomID(),
+						CommitedAt:  spanner.CommitTimestamp,
+					}); err != nil {
+						endCh <- err
+					}
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
