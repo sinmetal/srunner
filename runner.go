@@ -11,6 +11,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"github.com/morikuni/failure"
+	"github.com/sinmetal/srunner/item"
 	"github.com/sinmetal/srunner/tweet"
 	"github.com/sinmetal/stats"
 	"github.com/tenntenn/sync/fcfs"
@@ -665,6 +666,93 @@ func goGetTweet3Tables(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 						if ecode != codes.NotFound {
 							endCh <- err
 						}
+					}
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
+
+func goInsertItemOrder(as *item.AllStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "go/insertItemOrder")
+					defer span.End()
+
+					id := uuid.New().String()
+					if err := as.IOS.Insert(ctx, &item.ItemOrder{
+						ItemOrderID: id,
+						ItemID:      as.IMS.GetRandomID(),
+						UserID:      as.US.GetRandomID(),
+						CommitedAt:  spanner.CommitTimestamp,
+					}); err != nil {
+						endCh <- err
+					}
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
+
+func goInsertItemOrderNOFK(as *item.AllStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "go/insertItemOrderNOFK")
+					defer span.End()
+
+					id := uuid.New().String()
+					if err := as.IOSFK.Insert(ctx, &item.ItemOrderNOFK{
+						ItemOrderID: id,
+						ItemID:      as.IMS.GetRandomID(),
+						UserID:      as.US.GetRandomID(),
+						CommitedAt:  spanner.CommitTimestamp,
+					}); err != nil {
+						endCh <- err
+					}
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
+
+func goInsertItemOrderDummyFK(as *item.AllStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "go/insertItemOrderDummyFK")
+					defer span.End()
+
+					id := uuid.New().String()
+					if err := as.IODFKS.Insert(ctx, &item.ItemOrderDummyFK{
+						ItemOrderID: id,
+						ItemID:      as.IMS.GetRandomID(),
+						UserID:      as.US.GetRandomID(),
+						CommitedAt:  spanner.CommitTimestamp,
+					}); err != nil {
+						endCh <- err
 					}
 				}(i)
 			}
