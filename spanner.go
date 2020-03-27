@@ -12,6 +12,7 @@ func createClient(ctx context.Context, db string, o ...option.ClientOption) (*sp
 	config := spanner.ClientConfig{
 		SessionPoolConfig: spanner.SessionPoolConfig{
 			MaxIdle:       2000,
+			MaxOpened:     2000,
 			MinOpened:     1000,
 			WriteSessions: 0.0,
 		},
