@@ -6,11 +6,8 @@ require (
 	cloud.google.com/go/spanner v1.5.1
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.1
 	github.com/aws/aws-sdk-go v1.30.17 // indirect
-	github.com/gogo/protobuf v1.3.0 // indirect
-	github.com/google/addlicense v0.0.0-20190510175307-22550fa7c1b0 // indirect
 	github.com/google/uuid v1.1.1
-	github.com/hashicorp/go-multierror v1.1.0 // indirect
-	github.com/hashicorp/golang-lru v0.5.3 // indirect
+	github.com/hashicorp/go-multierror v1.0.0 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/morikuni/failure v0.12.1
 	github.com/pkg/errors v0.9.1
@@ -18,7 +15,6 @@ require (
 	github.com/sinmetal/stats v0.0.0-20191219083750-c350468745f5
 	github.com/tenntenn/sync v0.0.0-20180624231837-38c46c280d9d
 	go.opencensus.io v0.22.3
-	golang.org/x/exp v0.0.0-20200331195152-e8c3332aa8e5 // indirect
 	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sys v0.0.0-20200428200454-593003d681fa // indirect
