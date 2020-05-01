@@ -10,6 +10,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sinmetal/gcpmetadata"
 	"github.com/sinmetal/srunner/item"
+	"github.com/sinmetal/srunner/tweet"
 	"github.com/sinmetal/stats"
 	"go.opencensus.io/trace"
 	"google.golang.org/api/option"
@@ -75,17 +76,17 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	// ts := tweet.NewTweetStore(sc)
+	ts := tweet.NewTweetStore(sc)
 	ias := item.NewAllStore(ctx, sc)
 
 	endCh := make(chan error, 10)
 
-	// goInsertTweet(ts, env.Goroutine, endCh)
-	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
+	goInsertTweet(ts, env.Goroutine, endCh)
+	goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	// goInsertTweetWithFCFS(ts, env.Goroutine, endCh)
-	//goUpdateTweet(ts, env.Goroutine, endCh)
+	goUpdateTweet(ts, env.Goroutine, endCh)
 	// goUpdateTweetWithFCFS(ts, env.Goroutine, endCh)
-	//goGetExitsTweet(ts, env.Goroutine, endCh)
+	goGetExitsTweet(ts, env.Goroutine, endCh)
 	//goGetExitsTweetFCFS(ts, env.Goroutine, endCh)
 	//goGetNotFoundTweet(ts, env.Goroutine, endCh)
 	//goGetNotFoundTweetFCFS(ts, env.Goroutine, endCh)
