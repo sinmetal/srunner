@@ -90,7 +90,7 @@ func main() {
 	//goGetExitsTweetFCFS(ts, env.Goroutine, endCh)
 	//goGetNotFoundTweet(ts, env.Goroutine, endCh)
 	//goGetNotFoundTweetFCFS(ts, env.Goroutine, endCh)
-	// goGetTweet3Tables(ts, env.Goroutine, endCh)
+	goGetTweet3Tables(ts, env.Goroutine, endCh)
 
 	goInsertItemOrder(ias, env.Goroutine, endCh)
 	goInsertItemOrderNOFK(ias, env.Goroutine, endCh)
