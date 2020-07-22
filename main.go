@@ -64,6 +64,9 @@ func main() {
 		panic(err)
 	}
 
+	if err := spanner.EnableStatViews(); err != nil {
+		panic(err)
+	}
 	sc, err := createClient(ctx, env.SpannerDatabase,
 		option.WithGRPCDialOption(
 			grpc.WithTransportCredentials(&wrapTransportCredentials{
