@@ -260,6 +260,9 @@ func goInsertTweetBenchmark(ts tweet.TweetStore, goroutine int, endCh chan<- err
 func goUpdateTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
+			// 他のWorkerとぶつからないように適当に待って、同じRowを取らないようにする
+			time.Sleep(time.Duration(rand.Intn(600000)) * time.Millisecond)
+
 			ctx := context.Background()
 			ids, err := ts.QueryResultStruct(ctx, goroutine)
 			if err != nil {
