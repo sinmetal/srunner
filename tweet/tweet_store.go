@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/crc32"
+	"math/rand"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -202,8 +203,10 @@ func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, limit int) ([
 	ctx, span := startSpan(ctx, "queryResultStruct")
 	defer span.End()
 
-	st := spanner.NewStatement("SELECT ARRAY(SELECT STRUCT(Id, Author)) As IdWithAuthor FROM Tweet LIMIT @LIMIT;")
-	st.Params["LIMIT"] = limit
+	shardCreatedAt := rand.Intn(10)
+	st := spanner.NewStatement("SELECT ARRAY(SELECT STRUCT(Id, Author)) As IdWithAuthor FROM Tweet@{FORCE_INDEX=TweetShardCreatedAtAscCreatedAtDesc} WHERE ShardCreatedAt = @ShardCreatedAt LIMIT @Limit;")
+	st.Params["ShardCreatedAt"] = shardCreatedAt
+	st.Params["Limit"] = limit
 	iter := s.sc.Single().Query(ctx, st)
 	defer iter.Stop()
 
