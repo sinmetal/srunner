@@ -13,7 +13,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/morikuni/failure v0.13.0
 	github.com/pkg/errors v0.9.1
-	github.com/sinmetal/gcpbox v1.9.1 // indirect
+	github.com/sinmetal/gcpbox v1.9.1
 	github.com/sinmetal/gcpmetadata v0.0.0-20200522064512-f3d6c89c356f
 	github.com/sinmetal/stats v0.0.0-20200729075943-a049b20fc260
 	github.com/tenntenn/sync v0.0.0-20180624231837-38c46c280d9d
