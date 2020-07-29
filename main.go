@@ -7,8 +7,9 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
+	"github.com/google/uuid"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/sinmetal/gcpmetadata"
+	metadatabox "github.com/sinmetal/gcpbox/metadata"
 	"github.com/sinmetal/srunner/tweet"
 	"github.com/sinmetal/stats"
 	"go.opencensus.io/trace"
@@ -34,10 +35,15 @@ func main() {
 
 	tracePrefix = env.TracePrefix
 
-	project, err := gcpmetadata.GetProjectID()
+	project, err := metadatabox.ProjectID()
 	if err != nil {
 		panic(err)
 	}
+	zone, err := metadatabox.Zone()
+	if err != nil {
+		panic(err)
+	}
+	nodeID := uuid.New().String() // TODO 本当はPodのIDとかがいい
 
 	{
 		exporter, err := stackdriver.NewExporter(stackdriver.Options{
@@ -50,7 +56,9 @@ func main() {
 		// trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
 	}
 	{
-		exporter := stats.InitExporter(project)
+		labels := &stackdriver.Labels{}
+		labels.Set("Worker", nodeID, "Worker ID")
+		var exporter = stats.InitExporter(project, zone, "srunner", nodeID, labels)
 		if err := stats.InitOpenCensusStats(exporter); err != nil {
 			panic(err)
 		}
