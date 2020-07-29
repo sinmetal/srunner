@@ -8,9 +8,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/sinmetal/srunner/operation"
-	"go.opencensus.io/trace"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 )
@@ -22,7 +20,6 @@ type TweetStore interface {
 	InsertBench(ctx context.Context, id string) error
 	Update(ctx context.Context, id string) error
 	Get(ctx context.Context, key spanner.Key) (*Tweet, error)
-	GetTweet3Tables(ctx context.Context, key spanner.Key) ([]*Tweet, error)
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
 	QueryHeavy(ctx context.Context) ([]*Tweet, error)
 	QueryAll(ctx context.Context) (int, error)
@@ -71,7 +68,7 @@ func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) error {
 
 	m, err := spanner.InsertStruct(s.TableName(), tweet)
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("failed spanner.InsertStruct: %w", err)
 	}
 	ms := []*spanner.Mutation{
 		m,
@@ -79,7 +76,7 @@ func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) error {
 
 	_, err = s.sc.Apply(ctx, ms)
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("failed spanner.Apply: %w", err)
 	}
 
 	return nil
@@ -95,82 +92,13 @@ func (s *defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, e
 		if ecode == codes.NotFound {
 			return nil, err
 		}
-		return nil, errors.WithStack(err)
+		return nil, fmt.Errorf("failed spanner.ReadRow: %w", err)
 	}
 	var tweet Tweet
 	if err := row.ToStruct(&tweet); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, fmt.Errorf("failed spanner.Row.ToStruct: %w", err)
 	}
 	return &tweet, nil
-}
-
-func (s *defaultTweetStore) GetTweet3Tables(ctx context.Context, key spanner.Key) ([]*Tweet, error) {
-	var results []*Tweet
-
-	err := func() error {
-		ctx, span := trace.StartSpan(ctx, "getTweet")
-		defer span.End()
-
-		row, err := s.sc.Single().ReadRow(ctx, s.TableName(), key, []string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"})
-		if err != nil {
-			ecode := spanner.ErrCode(err)
-			if ecode == codes.NotFound {
-				return nil
-			}
-			return errors.WithStack(err)
-		}
-		var tweet Tweet
-		if err := row.ToStruct(&tweet); err != nil {
-			return errors.WithStack(err)
-		}
-		results = append(results, &tweet)
-		return nil
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	err = func() error {
-		row, err := s.sc.Single().ReadRow(ctx, "TweetDummy1", key, []string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"})
-		if err != nil {
-			ecode := spanner.ErrCode(err)
-			if ecode == codes.NotFound {
-				return nil
-			}
-			return errors.WithStack(err)
-		}
-		var tweet Tweet
-		if err := row.ToStruct(&tweet); err != nil {
-			return errors.WithStack(err)
-		}
-		results = append(results, &tweet)
-		return nil
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	err = func() error {
-		row, err := s.sc.Single().ReadRow(ctx, "TweetDummy2", key, []string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"})
-		if err != nil {
-			ecode := spanner.ErrCode(err)
-			if ecode == codes.NotFound {
-				return nil
-			}
-			return errors.WithStack(err)
-		}
-		var tweet Tweet
-		if err := row.ToStruct(&tweet); err != nil {
-			return errors.WithStack(err)
-		}
-		results = append(results, &tweet)
-		return nil
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	return results, nil
 }
 
 // Query is Tweet を sort_ascで取得する
@@ -192,12 +120,12 @@ func (s *defaultTweetStore) Query(ctx context.Context, limit int) ([]*Tweet, err
 			break
 		}
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, fmt.Errorf("failed spanner.Iterator.Next : %w", err)
 		}
 
 		var tweet Tweet
 		if err := row.ToStruct(&tweet); err != nil {
-			return nil, errors.WithStack(err)
+			return nil, fmt.Errorf("failed spanner.Row.ToStruct : %w", err)
 		}
 		tweets = append(tweets, &tweet)
 		count++
@@ -221,12 +149,12 @@ func (s *defaultTweetStore) QueryHeavy(ctx context.Context) ([]*Tweet, error) {
 			break
 		}
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, fmt.Errorf("failed spanner.Iterator.Next : %w", err)
 		}
 
 		var tweet Tweet
 		if err := row.ToStruct(&tweet); err != nil {
-			return nil, errors.WithStack(err)
+			return nil, fmt.Errorf("failed spanner.Row.ToStruct : %w", err)
 		}
 		tweets = append(tweets, &tweet)
 		count++
@@ -250,12 +178,12 @@ func (s *defaultTweetStore) QueryAll(ctx context.Context) (int, error) {
 			break
 		}
 		if err != nil {
-			return 0, errors.WithStack(err)
+			return 0, fmt.Errorf("failed spanner.Iterator.Next : %w", err)
 		}
 
 		var tweet Tweet
 		if err := row.ToStruct(&tweet); err != nil {
-			return 0, errors.WithStack(err)
+			return 0, fmt.Errorf("failed spanner.Row.ToStruct : %w", err)
 		}
 		count++
 	}
@@ -290,12 +218,12 @@ func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, limit int) ([
 			break
 		}
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, fmt.Errorf("failed spanner.Iterator.Next : %w", err)
 		}
 
 		var result Result
 		if err := row.ToStruct(&result); err != nil {
-			return nil, errors.WithStack(err)
+			return nil, fmt.Errorf("failed spanner.Row.ToStruct : %w", err)
 		}
 		ias = append(ias, result.IDWithAuthor[0])
 	}
@@ -310,22 +238,28 @@ func (s *defaultTweetStore) Update(ctx context.Context, id string) error {
 	_, err := s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		tr, err := txn.ReadRow(ctx, s.TableName(), spanner.Key{id}, []string{"Count"})
 		if err != nil {
-			return err
+			return fmt.Errorf("failed spanner.ReadRow : %w", err)
 		}
 
 		var count int64
 		if err := tr.ColumnByName("Count", &count); err != nil {
-			return err
+			return fmt.Errorf("failed spanner.ColumnByName : %w", err)
 		}
 		count++
 		cols := []string{"Id", "Count", "UpdatedAt", "CommitedAt"}
 
-		return txn.BufferWrite([]*spanner.Mutation{
+		err = txn.BufferWrite([]*spanner.Mutation{
 			spanner.Update(s.TableName(), cols, []interface{}{id, count, time.Now(), spanner.CommitTimestamp}),
 		})
+		if err != nil {
+			return fmt.Errorf("failed spanner.Tx.BufferWrite : %w", err)
+		}
+		return nil
 	})
-
-	return err
+	if err != nil {
+		return fmt.Errorf("failed TweetStore.Update : %w", err)
+	}
+	return nil
 }
 
 // InsertBench is 複数TableへのInsertを行う
