@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 
 	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
@@ -95,8 +96,10 @@ func main() {
 	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	// goInsertTweetWithFCFS(ts, env.Goroutine, endCh)
 	goUpdateTweet(ts, env.Goroutine, endCh)
+	goUpdateTweet(ts, rand.Intn(10)+env.Goroutine, endCh)
 	// goUpdateTweetWithFCFS(ts, env.Goroutine, endCh)
 	goGetExitsTweet(ts, env.Goroutine, endCh)
+	goGetExitsTweet(ts, rand.Intn(10)+env.Goroutine, endCh)
 	//goGetExitsTweetFCFS(ts, env.Goroutine, endCh)
 	//goGetNotFoundTweet(ts, env.Goroutine, endCh)
 	//goGetNotFoundTweetFCFS(ts, env.Goroutine, endCh)
