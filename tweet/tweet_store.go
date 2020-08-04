@@ -25,6 +25,7 @@ type TweetStore interface {
 	QueryHeavy(ctx context.Context) ([]*Tweet, error)
 	QueryAll(ctx context.Context) (int, error)
 	QueryResultStruct(ctx context.Context, limit int) ([]*TweetIDAndAuthor, error)
+	QueryRandom(ctx context.Context) error
 }
 
 var tweetStore TweetStore
@@ -133,6 +134,43 @@ func (s *defaultTweetStore) Query(ctx context.Context, limit int) ([]*Tweet, err
 	}
 
 	return tweets, nil
+}
+
+// QueryRandom is Query Statsを水増しするための適当なクエリを実行する
+func (s *defaultTweetStore) QueryRandom(ctx context.Context) error {
+	ctx, span := startSpan(ctx, "queryRandom")
+	defer span.End()
+
+	sql := fmt.Sprintf(`
+SELECT * 
+FROM (
+  SELECT * 
+  FROM ItemOrder 
+  WHERE UserID = "sinmetal" 
+  ORDER BY CommitedAt DESC 
+  Limit 10
+) IO 
+JOIN (
+  SELECT * 
+  FROM ItemMaster 
+  WHERE Price > %v) IM ON IO.ItemID = IM.ItemID
+JOIN User U ON IO.UserID = U.UserID
+`, rand.Int63())
+
+	iter := s.sc.Single().Query(ctx, spanner.NewStatement(fmt.Sprintf(sql)))
+	defer iter.Stop()
+
+	for {
+		_, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed spanner.Iterator.Next : %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *defaultTweetStore) QueryHeavy(ctx context.Context) ([]*Tweet, error) {
