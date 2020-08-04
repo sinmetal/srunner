@@ -257,6 +257,29 @@ func goInsertTweetBenchmark(ts tweet.TweetStore, goroutine int, endCh chan<- err
 	}()
 }
 
+func goQueryRandom(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "go/queryRandom")
+					defer span.End()
+
+					if err := ts.QueryRandom(ctx); err != nil {
+						endCh <- err
+					}
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
+
 func goUpdateTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
