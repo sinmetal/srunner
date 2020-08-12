@@ -11,7 +11,7 @@ import (
 func createClient(ctx context.Context, db string, o ...option.ClientOption) (*spanner.Client, error) {
 	config := spanner.ClientConfig{
 		SessionPoolConfig: spanner.SessionPoolConfig{
-			MinOpened: 50,
+			MinOpened:           50,
 			TrackSessionHandles: true,
 		},
 	}

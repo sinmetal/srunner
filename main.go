@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 
 	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
+	"github.com/google/uuid"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/sinmetal/gcpmetadata"
-	"github.com/sinmetal/srunner/item"
+	metadatabox "github.com/sinmetal/gcpbox/metadata"
 	"github.com/sinmetal/srunner/tweet"
 	"github.com/sinmetal/stats"
 	"go.opencensus.io/trace"
@@ -35,10 +36,15 @@ func main() {
 
 	tracePrefix = env.TracePrefix
 
-	project, err := gcpmetadata.GetProjectID()
+	project, err := metadatabox.ProjectID()
 	if err != nil {
 		panic(err)
 	}
+	zone, err := metadatabox.Zone()
+	if err != nil {
+		panic(err)
+	}
+	nodeID := uuid.New().String() // TODO 本当はPodのIDとかがいい
 
 	{
 		exporter, err := stackdriver.NewExporter(stackdriver.Options{
@@ -51,7 +57,9 @@ func main() {
 		// trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
 	}
 	{
-		exporter := stats.InitExporter(project)
+		labels := &stackdriver.Labels{}
+		labels.Set("Worker", nodeID, "Worker ID")
+		var exporter = stats.InitExporter(project, zone, "srunner", nodeID, labels)
 		if err := stats.InitOpenCensusStats(exporter); err != nil {
 			panic(err)
 		}
@@ -65,6 +73,9 @@ func main() {
 		panic(err)
 	}
 
+	if err := spanner.EnableStatViews(); err != nil {
+		panic(err)
+	}
 	sc, err := createClient(ctx, env.SpannerDatabase,
 		option.WithGRPCDialOption(
 			grpc.WithTransportCredentials(&wrapTransportCredentials{
@@ -77,25 +88,29 @@ func main() {
 		panic(err)
 	}
 	ts := tweet.NewTweetStore(sc)
-	ias := item.NewAllStore(ctx, sc)
+	// ias := item.NewAllStore(ctx, sc)
 
 	endCh := make(chan error, 10)
 
 	goInsertTweet(ts, env.Goroutine, endCh)
-	goInsertTweetBenchmark(ts, env.Goroutine, endCh)
+	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	// goInsertTweetWithFCFS(ts, env.Goroutine, endCh)
 	goUpdateTweet(ts, env.Goroutine, endCh)
+	goUpdateTweet(ts, rand.Intn(10)+env.Goroutine, endCh)
 	// goUpdateTweetWithFCFS(ts, env.Goroutine, endCh)
 	goGetExitsTweet(ts, env.Goroutine, endCh)
+	goGetExitsTweet(ts, rand.Intn(10)+env.Goroutine, endCh)
+	// goQueryRandom(ts, env.Goroutine, endCh)
 	//goGetExitsTweetFCFS(ts, env.Goroutine, endCh)
 	//goGetNotFoundTweet(ts, env.Goroutine, endCh)
 	//goGetNotFoundTweetFCFS(ts, env.Goroutine, endCh)
-	goGetTweet3Tables(ts, env.Goroutine, endCh)
+	// goGetTweet3Tables(ts, env.Goroutine, endCh)
 
-	goInsertItemOrder(ias, env.Goroutine, endCh)
-	goInsertItemOrderNOFK(ias, env.Goroutine, endCh)
-	goInsertItemOrderDummyFK(ias, env.Goroutine, endCh)
+	// goInsertItemOrder(ias, env.Goroutine, endCh)
+	// goInsertItemOrderNOFK(ias, env.Goroutine, endCh)
+	// goInsertItemOrderDummyFK(ias, env.Goroutine, endCh)
 
 	err = <-endCh
 	fmt.Printf("BOMB %+v", err)
+	sc.Close()
 }

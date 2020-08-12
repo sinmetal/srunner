@@ -60,22 +60,21 @@ func goInsertTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 					}()
 					select {
 					case <-ctx.Done():
-						fmt.Printf("TWEET_INSERT_TIMEOUT ID = %s, i = %d\n", id, i)
 						if err := stats.CountSpannerStatus(context.Background(), "INSERT TIMEOUT"); err != nil {
-							endCh <- err
+							endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 						}
 					case err := <-retCh:
 						if err != nil {
 							serr := stats.CountSpannerStatus(context.Background(), "INSERT NG")
 							if serr != nil {
-								err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
+								err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
 							}
 							if err != nil {
 								endCh <- err
 							}
 						} else {
 							if err := stats.CountSpannerStatus(context.Background(), "INSERT OK"); err != nil {
-								endCh <- err
+								endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 							}
 						}
 					}
@@ -138,7 +137,7 @@ func goInsertTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 							defer span.End()
 							err := stats.CountSpannerStatus(context.Background(), "INSERT_FCFS_SECOND START")
 							if err != nil {
-								return "", err
+								return "", fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 							}
 							return "", ts.Insert(ctx, t)
 						}
@@ -153,22 +152,20 @@ func goInsertTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 					if failure.Is(err, Timeout) {
 						fmt.Printf("TWEET_INSERT_TIMEOUT ID = %s, i = %d\n", id, i)
 						if err := stats.CountSpannerStatus(context.Background(), "INSERT_FCFS TIMEOUT"); err != nil {
-							endCh <- err
+							endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 						}
 						return
 					} else if err != nil {
 						fmt.Printf("TWEET_INSERT_NG ID = %s, i = %d\n", id, i)
 						serr := stats.CountSpannerStatus(context.Background(), "INSERT_FCFS NG")
 						if serr != nil {
-							err = failure.Wrap(err, failure.Messagef("failed stats. err=%+v", serr))
+							err = fmt.Errorf("failed stats.CountSpannerStatus : %w", fmt.Errorf("failed Tweet.Insert : %w", err))
 						}
-						if err != nil {
-							endCh <- err
-						}
+						endCh <- err
 						return
 					}
 					if err := stats.CountSpannerStatus(context.Background(), "INSERT_FCFS OK"); err != nil {
-						endCh <- err
+						endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 					}
 				}(i)
 			}
@@ -260,9 +257,35 @@ func goInsertTweetBenchmark(ts tweet.TweetStore, goroutine int, endCh chan<- err
 	}()
 }
 
+func goQueryRandom(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
+	go func() {
+		for {
+			var wg sync.WaitGroup
+			for i := 0; i < goroutine; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+
+					ctx := context.Background()
+					ctx, span := startSpan(ctx, "go/queryRandom")
+					defer span.End()
+
+					if err := ts.QueryRandom(ctx); err != nil {
+						endCh <- err
+					}
+				}(i)
+			}
+			wg.Wait()
+		}
+	}()
+}
+
 func goUpdateTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 	go func() {
 		for {
+			// 他のWorkerとぶつからないように適当に待って、同じRowを取らないようにする
+			time.Sleep(time.Duration(rand.Intn(600000)) * time.Millisecond)
+
 			ctx := context.Background()
 			ids, err := ts.QueryResultStruct(ctx, goroutine)
 			if err != nil {
@@ -631,40 +654,6 @@ func goGetNotFoundTweetFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- err
 							if err := stats.CountSpannerStatus(context.Background(), "GET_NOT_FOUND_FCFS OK"); err != nil {
 								endCh <- err
 							}
-						}
-					}
-				}(i)
-			}
-			wg.Wait()
-		}
-	}()
-}
-
-func goGetTweet3Tables(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
-	go func() {
-		for {
-			var wg sync.WaitGroup
-			for i := 0; i < goroutine; i++ {
-				i := i
-				wg.Add(1)
-				go func(i int) {
-					defer wg.Done()
-
-					ctx := context.Background()
-					ctx, span := startSpan(ctx, "go/goGetTweet3Tables")
-					defer span.End()
-
-					var cancel context.CancelFunc
-					if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-						ctx, cancel = context.WithTimeout(ctx, 3*time.Second)
-						defer cancel()
-					}
-					key := spanner.Key{uuid.New().String()}
-					_, err := ts.GetTweet3Tables(ctx, key)
-					if err != nil {
-						ecode := spanner.ErrCode(err) // NOTFOUNDの時はGetTweet3Tablesがerr=nilで返してくるので、実際にはここは意味ない
-						if ecode != codes.NotFound {
-							endCh <- err
 						}
 					}
 				}(i)
