@@ -100,7 +100,7 @@ func main() {
 	// goUpdateTweetWithFCFS(ts, env.Goroutine, endCh)
 	goGetExitsTweet(ts, env.Goroutine, endCh)
 	goGetExitsTweet(ts, rand.Intn(10)+env.Goroutine, endCh)
-	// goQueryRandom(ts, env.Goroutine, endCh)
+	goQueryRandom(ts, env.Goroutine, endCh)
 	//goGetExitsTweetFCFS(ts, env.Goroutine, endCh)
 	//goGetNotFoundTweet(ts, env.Goroutine, endCh)
 	//goGetNotFoundTweetFCFS(ts, env.Goroutine, endCh)
