@@ -16,6 +16,8 @@ func init() {
 }
 
 func TestInParam(t *testing.T) {
+	t.SkipNow()
+
 	ctx := context.Background()
 
 	dbName := fmt.Sprintf("projects/%s/instances/%s/databases/%s", "gcpug-public-spanner", "merpay-sponsored-instance", "sinmetal_benchmark_a")
@@ -49,16 +51,18 @@ func TestInParam(t *testing.T) {
 func TestDefaultTweetStore_Insert(t *testing.T) {
 	ctx := context.Background()
 
-	dbName := fmt.Sprintf("projects/fake/instances/fake/databases/%s", RandString(8))
-	fmt.Println(dbName)
-	sc, err := spanner.NewClient(ctx, dbName)
+	NewTestInstance(t)
+
+	dbName := RandString(8)
+
+	statements := readDDLFile(t, "../ddl/tweet.sql")
+	NewDatabase(t, dbName, statements)
+
+	sc, err := spanner.NewClient(ctx, fmt.Sprintf("projects/fake/instances/fake/databases/%s", dbName))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer sc.Close()
-
-	statements := readDDLFile(t, "../ddl/tweet.sql")
-	ddl(t, dbName, statements)
 
 	ts := NewTweetStore(sc)
 
