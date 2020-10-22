@@ -3,13 +3,13 @@ steps:
   args: ['run', '-d', '--network=cloudbuild', '-p', '9010:9010', '-p', '9020:9020', '--name=spanner-emulator', 'gcr.io/cloud-spanner-emulator/emulator']
 - name: jwilder/dockerize:0.6.1
   args: ['dockerize', '-timeout=60s', '-wait=tcp://spanner-emulator:9020']
-- name: 'golang:1.14-stretch'
+- name: 'golang:1.15-buster'
   entrypoint: 'go'
   args: ['test', '-v', './...']
   env:
     - 'GO111MODULE=on'
     - 'SPANNER_EMULATOR_HOST=spanner-emulator:9010'
-- name: 'golang:1.14-stretch'
+- name: 'golang:1.15-buster'
   entrypoint: 'go'
   args: ['build', '.']
   env: ['GO111MODULE=on']
