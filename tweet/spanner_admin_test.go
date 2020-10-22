@@ -2,18 +2,70 @@ package tweet
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 
-	"cloud.google.com/go/spanner/admin/database/apiv1"
+	sadb "cloud.google.com/go/spanner/admin/database/apiv1"
+	sai "cloud.google.com/go/spanner/admin/instance/apiv1"
 	"google.golang.org/api/option"
-	databasepb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
+	sadbpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
+	saipb "google.golang.org/genproto/googleapis/spanner/admin/instance/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-func ddl(t *testing.T, dbName string, statements []string) {
+func NewTestInstance(t *testing.T) {
+	ctx := context.Background()
+	saiCli, err := sai.NewInstanceAdminClient(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ope, err := saiCli.CreateInstance(ctx, &saipb.CreateInstanceRequest{
+		Parent:     fmt.Sprintf("projects/fake"),
+		InstanceId: "fake",
+	})
+	if err != nil {
+		sts, ok := status.FromError(err)
+		if !ok {
+			t.Fatal(err)
+		}
+		if sts.Code() == codes.AlreadyExists {
+			// すでに存在するなら、それを使うので、スルー
+			return
+		}
+	}
+	_, err = ope.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func NewDatabase(t *testing.T, databaseName string, statements []string) {
+	ctx := context.Background()
+
+	sadbCli, err := sadb.NewDatabaseAdminClient(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ope, err := sadbCli.CreateDatabase(ctx, &sadbpb.CreateDatabaseRequest{
+		Parent:          "projects/fake/instances/fake",
+		CreateStatement: "CREATE DATABASE `" + databaseName + "`",
+		ExtraStatements: statements,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = ope.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func updateDDL(t *testing.T, dbName string, statements []string) {
 	ctx := context.Background()
 
 	var opts []option.ClientOption
@@ -26,12 +78,12 @@ func ddl(t *testing.T, dbName string, statements []string) {
 		opts = append(opts, emulatorOpts...)
 	}
 
-	admin, err := database.NewDatabaseAdminClient(ctx, opts...)
+	admin, err := sadb.NewDatabaseAdminClient(ctx, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = admin.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+	_, err = admin.UpdateDatabaseDdl(ctx, &sadbpb.UpdateDatabaseDdlRequest{
 		Database:   dbName,
 		Statements: statements,
 	})
