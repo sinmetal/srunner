@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/rand"
 
 	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
@@ -88,18 +87,29 @@ func main() {
 		panic(err)
 	}
 	ts := tweet.NewTweetStore(sc)
+
 	// ias := item.NewAllStore(ctx, sc)
 
 	endCh := make(chan error, 10)
 
-	goInsertTweet(ts, env.Goroutine, endCh)
+	runnerV2 := &RunnerV2{
+		ts:    ts,
+		endCh: endCh,
+	}
+
+	// 秒間 50 Requestにするための concurrent count
+	// 200 ms ごとに実行されるので、default は秒間 5, なので、concurrent は 10 になる
+	const concurrentReq50PerSec = 10
+
+	runnerV2.GoInsertTweet(concurrentReq50PerSec)
+	//goInsertTweet(ts, env.Goroutine, endCh)
 	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	// goInsertTweetWithFCFS(ts, env.Goroutine, endCh)
-	goUpdateTweet(ts, env.Goroutine, endCh)
-	goUpdateTweet(ts, rand.Intn(10)+env.Goroutine, endCh)
+	//goUpdateTweet(ts, env.Goroutine, endCh)
+	//goUpdateTweet(ts, rand.Intn(10)+env.Goroutine, endCh)
 	// goUpdateTweetWithFCFS(ts, env.Goroutine, endCh)
-	goGetExitsTweet(ts, env.Goroutine, endCh)
-	goGetExitsTweet(ts, rand.Intn(10)+env.Goroutine, endCh)
+	//goGetExitsTweet(ts, env.Goroutine, endCh)
+	//goGetExitsTweet(ts, rand.Intn(10)+env.Goroutine, endCh)
 
 	// Query Stats 水増し Random Query
 	// goQueryRandom(ts, env.Goroutine, endCh)
