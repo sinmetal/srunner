@@ -58,6 +58,7 @@ func main() {
 	{
 		labels := &stackdriver.Labels{}
 		labels.Set("Worker", nodeID, "Worker ID")
+		labels.Set("Spanner", env.SpannerDatabase, "Target Spanner Database")
 		var exporter = stats.InitExporter(project, zone, "srunner", nodeID, labels)
 		if err := stats.InitOpenCensusStats(exporter); err != nil {
 			panic(err)
