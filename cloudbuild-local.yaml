@@ -3,13 +3,13 @@ steps:
   args: ['run', '-d', '--network=cloudbuild', '-p', '9999:9999', '--name=handy-spanner', 'gcr.io/gcpug-container/handy-spanner:v0.1.0']
 - name: jwilder/dockerize:0.6.1
   args: ['dockerize', '-timeout=60s', '-wait=tcp://handy-spanner:9999']
-- name: 'golang:1.15-stretch'
+- name: 'golang:1.15-alpine'
   entrypoint: 'go'
   args: ['test', '-v', './...']
   env:
     - 'GO111MODULE=on'
     - 'SPANNER_EMULATOR_HOST=handy-spanner:9999'
-- name: 'golang:1.15-stretch'
+- name: 'golang:1.15-alpine'
   entrypoint: 'go'
   args: ['build', '.']
   env: ['GO111MODULE=on']
