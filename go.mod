@@ -13,8 +13,8 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/morikuni/failure v0.13.0
 	github.com/pkg/errors v0.9.1
-	github.com/sinmetal/gcpbox v1.22.0
 	github.com/sinmetal/stats v0.0.0-20200729075943-a049b20fc260
+	github.com/sinmetalcraft/gcpbox v1.2.0
 	github.com/tenntenn/sync v0.0.0-20180624231837-38c46c280d9d
 	go.opencensus.io v0.22.5
 	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43

@@ -182,10 +182,10 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
-github.com/sinmetal/gcpbox v1.22.0 h1:PSWhsRpYTZ3x/IOi6FAG3KNErbNa5yGCc3kfUKVQJpQ=
-github.com/sinmetal/gcpbox v1.22.0/go.mod h1:0tuOvf+RpizCinvLBZKAVykHWm0SdBRSgMn6fi0IfEs=
 github.com/sinmetal/stats v0.0.0-20200729075943-a049b20fc260 h1:0JPZu82iCk7K/9Ed7H2hDV0J1p59Bdg6e7PWXFVIPmI=
 github.com/sinmetal/stats v0.0.0-20200729075943-a049b20fc260/go.mod h1:0Ynpnpk9eNqAbk9gBweJeKNgiAZU11H83TFcEXTk9us=
+github.com/sinmetalcraft/gcpbox v1.2.0 h1:mN3i3K8oBKm4cayRYOtxpH/FK9UmAm5NNk7RkOsq7Rk=
+github.com/sinmetalcraft/gcpbox v1.2.0/go.mod h1:8tYGINdeJ9eYUrqbTEArBNhfk9gTYQKNJwZn0S7VHHk=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
 github.com/stretchr/testify v1.5.1 h1:nOGnQDM7FYENwehXlg/kFVnos3rEvtKTjRvOWSzb6H4=
