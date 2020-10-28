@@ -74,9 +74,7 @@ func (run *RunnerV2) insertTweet(ctx context.Context, id string) {
 			if serr != nil {
 				err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
 			}
-			if err != nil {
-				run.endCh <- err
-			}
+			fmt.Printf("failed InsertTweet : %+v\n", err)
 		} else {
 			if err := stats.CountSpannerStatus(context.Background(), "INSERT OK"); err != nil {
 				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
@@ -86,7 +84,7 @@ func (run *RunnerV2) insertTweet(ctx context.Context, id string) {
 }
 
 func (run *RunnerV2) GoUpdateTweet(concurrent int) {
-	idCh := make(chan string, 100000)
+	idCh := make(chan string, 10000)
 	go func() {
 		t := time.NewTicker(1000 * time.Millisecond)
 		defer t.Stop()
@@ -95,9 +93,9 @@ func (run *RunnerV2) GoUpdateTweet(concurrent int) {
 			case <-t.C:
 				ctx := context.Background()
 
-				ids, err := run.ts.QueryResultStruct(ctx, 5000)
+				ids, err := run.ts.QueryResultStruct(ctx, 1000)
 				if err != nil {
-					run.endCh <- err
+					run.endCh <- fmt.Errorf("failed GoUpdateTweet : QueryResultStruct : %w", err)
 				}
 				for _, id := range ids {
 					idCh <- id.ID
@@ -148,9 +146,7 @@ func (run *RunnerV2) updateTweet(ctx context.Context, id string) {
 			if serr != nil {
 				err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
 			}
-			if err != nil {
-				run.endCh <- err
-			}
+			fmt.Printf("failed UpdateTweet : %+v\n", err)
 		} else {
 			if err := stats.CountSpannerStatus(context.Background(), "UPDATE OK"); err != nil {
 				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
