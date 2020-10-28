@@ -42,7 +42,7 @@ func (run *RunnerV2) insertTweet(ctx context.Context, id string) {
 
 	var cancel context.CancelFunc
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		ctx, cancel = context.WithTimeout(ctx, 800*time.Millisecond)
+		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
 		defer cancel()
 	}
 
@@ -79,6 +79,80 @@ func (run *RunnerV2) insertTweet(ctx context.Context, id string) {
 			}
 		} else {
 			if err := stats.CountSpannerStatus(context.Background(), "INSERT OK"); err != nil {
+				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+			}
+		}
+	}
+}
+
+func (run *RunnerV2) GoUpdateTweet(concurrent int) {
+	idCh := make(chan string, 100000)
+	go func() {
+		t := time.NewTicker(1000 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				ctx := context.Background()
+
+				ids, err := run.ts.QueryResultStruct(ctx, 5000)
+				if err != nil {
+					run.endCh <- err
+				}
+				for _, id := range ids {
+					idCh <- id.ID
+				}
+			}
+		}
+	}()
+
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			t := time.NewTicker(200 * time.Millisecond)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					ctx := context.Background()
+
+					id := <-idCh
+					run.updateTweet(ctx, id)
+				}
+			}
+		}()
+	}
+}
+
+func (run *RunnerV2) updateTweet(ctx context.Context, id string) {
+	ctx, span := startSpan(ctx, "goV2/updateTweet")
+	defer span.End()
+
+	var cancel context.CancelFunc
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+		defer cancel()
+	}
+
+	retCh := make(chan error, 1)
+	go func() {
+		retCh <- run.ts.Update(ctx, id)
+	}()
+	select {
+	case <-ctx.Done():
+		if err := stats.CountSpannerStatus(context.Background(), "UPDATE TIMEOUT"); err != nil {
+			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+		}
+	case err := <-retCh:
+		if err != nil {
+			serr := stats.CountSpannerStatus(context.Background(), "UPDATE NG")
+			if serr != nil {
+				err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
+			}
+			if err != nil {
+				run.endCh <- err
+			}
+		} else {
+			if err := stats.CountSpannerStatus(context.Background(), "UPDATE OK"); err != nil {
 				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 			}
 		}
