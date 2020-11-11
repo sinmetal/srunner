@@ -8,7 +8,6 @@ CREATE TABLE Tweet (
 	CreatedAt TIMESTAMP NOT NULL,
 	UpdatedAt TIMESTAMP NOT NULL,
 	CommitedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
-	NewSimpleColumn INT64,
 	SchemaVersion INT64,
 	Content STRING(MAX),
 ) PRIMARY KEY (Id);

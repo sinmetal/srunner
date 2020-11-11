@@ -82,6 +82,58 @@ func (run *RunnerV2) insertTweet(ctx context.Context, id string) {
 	}
 }
 
+func (run *RunnerV2) GoInsertTweetWithOperation(concurrent int) {
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			t := time.NewTicker(200 * time.Millisecond)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					ctx := context.Background()
+
+					id := uuid.New().String()
+					run.insertTweetWithOperation(ctx, id)
+				}
+			}
+		}()
+	}
+}
+
+func (run *RunnerV2) insertTweetWithOperation(ctx context.Context, id string) {
+	ctx, span := startSpan(ctx, "goV2/insertTweetWithOperation")
+	defer span.End()
+
+	var cancel context.CancelFunc
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+		defer cancel()
+	}
+
+	retCh := make(chan error, 1)
+	go func() {
+		retCh <- run.ts.InsertWithOperation(ctx, id)
+	}()
+	select {
+	case <-ctx.Done():
+		if err := CountSpannerStatus(context.Background(), "INSERT WITH Operation TIMEOUT", MetricsKindTimeout); err != nil {
+			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+		}
+	case err := <-retCh:
+		if err != nil {
+			serr := CountSpannerStatus(context.Background(), "INSERT WITH Operation NG", MetricsKindTimeout)
+			if serr != nil {
+				err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
+			}
+			fmt.Printf("failed InsertTweet : %+v\n", err)
+		} else {
+			if err := CountSpannerStatus(context.Background(), "INSERT WITH Operation OK", MetricsKindTimeout); err != nil {
+				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+			}
+		}
+	}
+}
+
 func (run *RunnerV2) GoUpdateTweet(concurrent int) {
 	idCh := make(chan string, 10000)
 	go func() {
@@ -221,6 +273,59 @@ func (run *RunnerV2) getTweet(ctx context.Context, id string) {
 			fmt.Printf("failed GetTweet : %+v\n", err)
 		} else {
 			if err := CountSpannerStatus(context.Background(), "GET TWEET OK", MetricsKindOK); err != nil {
+				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+			}
+		}
+	}
+}
+
+func (run *RunnerV2) GoQueryTweetLatestByAuthor(concurrent int) {
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			t := time.NewTicker(200 * time.Millisecond)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					ctx := context.Background()
+
+					author := getAuthor()
+					run.queryTweetLatestByAuthor(ctx, author)
+				}
+			}
+		}()
+	}
+}
+
+func (run *RunnerV2) queryTweetLatestByAuthor(ctx context.Context, author string) {
+	ctx, span := startSpan(ctx, "goV2/getTweetLatestByAuthor")
+	defer span.End()
+
+	var cancel context.CancelFunc
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+		defer cancel()
+	}
+
+	retCh := make(chan error, 1)
+	go func() {
+		_, err := run.ts.QueryLatestByAuthor(ctx, author)
+		retCh <- err
+	}()
+	select {
+	case <-ctx.Done():
+		if err := CountSpannerStatus(context.Background(), "QUERY LATEST BY AUTHOR TIMEOUT", MetricsKindTimeout); err != nil {
+			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+		}
+	case err := <-retCh:
+		if err != nil {
+			serr := CountSpannerStatus(context.Background(), "QUERY LATEST BY AUTHOR NG", MetricsKindNG)
+			if serr != nil {
+				err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
+			}
+			fmt.Printf("failed QueryLatestByAuthor : %+v\n", err)
+		} else {
+			if err := CountSpannerStatus(context.Background(), "QUERY LATEST BY AUTHOR OK", MetricsKindOK); err != nil {
 				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 			}
 		}
