@@ -18,7 +18,7 @@ import (
 type TweetStore interface {
 	TableName() string
 	Insert(ctx context.Context, tweet *Tweet) error
-	InsertBench(ctx context.Context, id string) error
+	InsertWithOperation(ctx context.Context, id string) error
 	Update(ctx context.Context, id string) error
 	Get(ctx context.Context, key spanner.Key) (*Tweet, error)
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
@@ -26,6 +26,7 @@ type TweetStore interface {
 	QueryAll(ctx context.Context) (int, error)
 	QueryResultStruct(ctx context.Context, limit int) ([]*TweetIDAndAuthor, error)
 	QueryRandom(ctx context.Context) error
+	QueryLatestByAuthor(ctx context.Context, author string) ([]*Tweet, error)
 }
 
 var tweetStore TweetStore
@@ -52,6 +53,7 @@ type Tweet struct {
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	CommitedAt     time.Time
+	SchemaVersion  int64
 }
 
 type defaultTweetStore struct {
@@ -82,6 +84,43 @@ func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) error {
 	}
 
 	return nil
+}
+
+// InsertWithOperation is Tweet Table と Operation Table に Insertを行う
+func (s *defaultTweetStore) InsertWithOperation(ctx context.Context, id string) error {
+	ctx, span := startSpan(ctx, "insertWithOperation")
+	defer span.End()
+
+	ml := []*spanner.Mutation{}
+	now := time.Now()
+
+	shardId := crc32.ChecksumIEEE([]byte(now.String())) % 10
+	t := &Tweet{
+		ID:             id,
+		Content:        id,
+		Favos:          []string{},
+		ShardCreatedAt: int64(shardId),
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		CommitedAt:     spanner.CommitTimestamp,
+	}
+	tm, err := spanner.InsertStruct(s.TableName(), t)
+	if err != nil {
+		return err
+	}
+	ml = append(ml, tm)
+
+	tom, err := operation.NewOperationInsertMutation(uuid.New().String(), "INSERT", "", s.TableName(), t)
+	if err != nil {
+		return err
+	}
+	ml = append(ml, tom)
+
+	_, err = s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		return txn.BufferWrite(ml)
+	})
+
+	return err
 }
 
 func (s *defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, error) {
@@ -354,4 +393,26 @@ func (s *defaultTweetStore) InsertBench(ctx context.Context, id string) error {
 	})
 
 	return err
+}
+
+// InsertBench is 複数TableへのInsertを行う
+func (s *defaultTweetStore) QueryLatestByAuthor(ctx context.Context, author string) ([]*Tweet, error) {
+	stm := spanner.NewStatement("SELECT * FROM Tweet WHERE Author = @Author ORDER BY CreatedAt DESC LIMIT @Limit")
+	stm.Params["Author"] = author
+	stm.Params["Limit"] = 50
+
+	var results []*Tweet
+	iter := s.sc.Single().Query(ctx, stm)
+	defer iter.Stop()
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			return results, nil
+		}
+		var t *Tweet
+		if err := row.ToStruct(t); err != nil {
+			return nil, err
+		}
+		results = append(results, t)
+	}
 }
