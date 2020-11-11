@@ -69,13 +69,13 @@ func (run *RunnerV2) insertTweet(ctx context.Context, id string) {
 		}
 	case err := <-retCh:
 		if err != nil {
-			serr := CountSpannerStatus(context.Background(), "INSERT NG", MetricsKindTimeout)
+			serr := CountSpannerStatus(context.Background(), "INSERT NG", MetricsKindNG)
 			if serr != nil {
 				err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
 			}
 			fmt.Printf("failed InsertTweet : %+v\n", err)
 		} else {
-			if err := CountSpannerStatus(context.Background(), "INSERT OK", MetricsKindTimeout); err != nil {
+			if err := CountSpannerStatus(context.Background(), "INSERT OK", MetricsKindOK); err != nil {
 				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 			}
 		}
@@ -121,13 +121,13 @@ func (run *RunnerV2) insertTweetWithOperation(ctx context.Context, id string) {
 		}
 	case err := <-retCh:
 		if err != nil {
-			serr := CountSpannerStatus(context.Background(), "INSERT WITH Operation NG", MetricsKindTimeout)
+			serr := CountSpannerStatus(context.Background(), "INSERT WITH Operation NG", MetricsKindNG)
 			if serr != nil {
 				err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
 			}
 			fmt.Printf("failed InsertTweet : %+v\n", err)
 		} else {
-			if err := CountSpannerStatus(context.Background(), "INSERT WITH Operation OK", MetricsKindTimeout); err != nil {
+			if err := CountSpannerStatus(context.Background(), "INSERT WITH Operation OK", MetricsKindOK); err != nil {
 				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 			}
 		}
@@ -193,13 +193,13 @@ func (run *RunnerV2) updateTweet(ctx context.Context, id string) {
 		}
 	case err := <-retCh:
 		if err != nil {
-			serr := CountSpannerStatus(context.Background(), "UPDATE NG", MetricsKindTimeout)
+			serr := CountSpannerStatus(context.Background(), "UPDATE NG", MetricsKindNG)
 			if serr != nil {
 				err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
 			}
 			fmt.Printf("failed UpdateTweet : %+v\n", err)
 		} else {
-			if err := CountSpannerStatus(context.Background(), "UPDATE OK", MetricsKindTimeout); err != nil {
+			if err := CountSpannerStatus(context.Background(), "UPDATE OK", MetricsKindOK); err != nil {
 				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 			}
 		}
