@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sinmetal/srunner/tweet"
-	"github.com/sinmetal/stats"
 	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 	"go.opencensus.io/trace"
 	"google.golang.org/api/option"
@@ -59,8 +58,8 @@ func main() {
 		labels := &stackdriver.Labels{}
 		labels.Set("Worker", nodeID, "Worker ID")
 		labels.Set("Spanner", env.SpannerDatabase, "Target Spanner Database")
-		var exporter = stats.InitExporter(project, zone, "srunner", nodeID, labels)
-		if err := stats.InitOpenCensusStats(exporter); err != nil {
+		var exporter = InitExporter(project, zone, "srunner", nodeID, labels)
+		if err := InitOpenCensusStats(exporter); err != nil {
 			panic(err)
 		}
 	}
