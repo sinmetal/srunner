@@ -97,7 +97,7 @@ var (
 	SpannerStatusCountView = &view.View{
 		Name:        SpannerStatus,
 		Description: "spanner status count",
-		TagKeys:     []tag.Key{KeySource},
+		TagKeys:     []tag.Key{KeySource, KeyKind},
 		Measure:     MSpannerStatusCount,
 		Aggregation: view.Count(),
 	}
