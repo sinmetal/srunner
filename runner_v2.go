@@ -210,18 +210,18 @@ func (run *RunnerV2) getTweet(ctx context.Context, id string) {
 	}()
 	select {
 	case <-ctx.Done():
-		if err := stats.CountSpannerStatus(context.Background(), "GET TWEET TIMEOUT"); err != nil {
+		if err := CountSpannerStatus(context.Background(), "GET TWEET TIMEOUT", MetricsKindTimeout); err != nil {
 			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 		}
 	case err := <-retCh:
 		if err != nil {
-			serr := stats.CountSpannerStatus(context.Background(), "GET TWEET NG")
+			serr := CountSpannerStatus(context.Background(), "GET TWEET NG", MetricsKindNG)
 			if serr != nil {
 				err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
 			}
 			fmt.Printf("failed GetTweet : %+v\n", err)
 		} else {
-			if err := stats.CountSpannerStatus(context.Background(), "GET TWEET OK"); err != nil {
+			if err := CountSpannerStatus(context.Background(), "GET TWEET OK", MetricsKindOK); err != nil {
 				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
 			}
 		}
