@@ -81,6 +81,11 @@ const (
 )
 
 var (
+	// KeySource is the key for label in "generic_node",
+	KeySource, _ = tag.NewKey("source")
+
+	KeyKind, _ = tag.NewKey("kind")
+
 	// Measure variables
 	MLogSize            = stats.Int64(LogSize, "logSize", ByteSizeUnit)
 	MRedisStatusCount   = stats.Int64(RedisStatus, "redis status", CountUnit)
@@ -118,11 +123,6 @@ var (
 		RedisStatusCountView,
 		SpannerStatusCountView,
 	}
-
-	// KeySource is the key for label in "generic_node",
-	KeySource, _ = tag.NewKey("source")
-
-	KeyKind, _ = tag.NewKey("kind")
 )
 
 func InitOpenCensusStats(exporter *stackdriver.Exporter) error {
