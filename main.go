@@ -104,6 +104,7 @@ func main() {
 
 	runnerV2.GoInsertTweet(concurrentReq50PerSec)
 	runnerV2.GoUpdateTweet(concurrentReq50PerSec)
+	runnerV2.GoGetTweet(concurrentReq50PerSec)
 	//goInsertTweet(ts, env.Goroutine, endCh)
 	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	// goInsertTweetWithFCFS(ts, env.Goroutine, endCh)

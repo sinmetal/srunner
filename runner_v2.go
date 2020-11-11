@@ -154,3 +154,76 @@ func (run *RunnerV2) updateTweet(ctx context.Context, id string) {
 		}
 	}
 }
+
+func (run *RunnerV2) GoGetTweet(concurrent int) {
+	idCh := make(chan string, 10000)
+	go func() {
+		t := time.NewTicker(1000 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				ctx := context.Background()
+
+				ids, err := run.ts.QueryResultStruct(ctx, 1000)
+				if err != nil {
+					run.endCh <- fmt.Errorf("failed GoGetTweet : QueryResultStruct : %w", err)
+				}
+				for _, id := range ids {
+					idCh <- id.ID
+				}
+			}
+		}
+	}()
+
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			t := time.NewTicker(200 * time.Millisecond)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					ctx := context.Background()
+
+					id := <-idCh
+					run.getTweet(ctx, id)
+				}
+			}
+		}()
+	}
+}
+
+func (run *RunnerV2) getTweet(ctx context.Context, id string) {
+	ctx, span := startSpan(ctx, "goV2/getTweet")
+	defer span.End()
+
+	var cancel context.CancelFunc
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+		defer cancel()
+	}
+
+	retCh := make(chan error, 1)
+	go func() {
+		_, err := run.ts.Get(ctx, spanner.Key{id})
+		retCh <- err
+	}()
+	select {
+	case <-ctx.Done():
+		if err := stats.CountSpannerStatus(context.Background(), "GET TWEET TIMEOUT"); err != nil {
+			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+		}
+	case err := <-retCh:
+		if err != nil {
+			serr := stats.CountSpannerStatus(context.Background(), "GET TWEET NG")
+			if serr != nil {
+				err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
+			}
+			fmt.Printf("failed GetTweet : %+v\n", err)
+		} else {
+			if err := stats.CountSpannerStatus(context.Background(), "GET TWEET OK"); err != nil {
+				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+			}
+		}
+	}
+}
