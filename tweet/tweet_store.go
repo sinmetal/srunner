@@ -413,7 +413,7 @@ func (s *defaultTweetStore) QueryLatestByAuthor(ctx context.Context, author stri
 			return nil, err
 		}
 
-		var t *Tweet
+		t := &Tweet{}
 		if err := row.ToStruct(t); err != nil {
 			return nil, err
 		}
