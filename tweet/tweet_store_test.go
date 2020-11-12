@@ -101,8 +101,23 @@ func TestDefaultTweetStore_QueryLatestByAuthor(t *testing.T) {
 	defer sc.Close()
 
 	ts := NewTweetStore(sc)
+	now := time.Now()
+	if err := ts.Insert(ctx, &Tweet{
+		ID:             "test",
+		Author:         "sinmetal",
+		Content:        "hello world",
+		Count:          0,
+		Favos:          []string{},
+		Sort:           0,
+		ShardCreatedAt: 0,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		CommitedAt:     spanner.CommitTimestamp,
+	}); err != nil {
+		t.Fatal(err)
+	}
 
-	_, err = ts.QueryLatestByAuthor(ctx, "hoge")
+	_, err = ts.QueryLatestByAuthor(ctx, "sinmetal")
 	if err != nil {
 		t.Fatal(err)
 	}
