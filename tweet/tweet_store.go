@@ -18,6 +18,7 @@ import (
 type TweetStore interface {
 	TableName() string
 	Insert(ctx context.Context, tweet *Tweet) error
+	InsertBench(ctx context.Context, id string) error
 	InsertWithOperation(ctx context.Context, id string) error
 	Update(ctx context.Context, id string) error
 	Get(ctx context.Context, key spanner.Key) (*Tweet, error)
