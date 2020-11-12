@@ -34,12 +34,12 @@ var tweetStore TweetStore
 
 // NewTweetStore is New TweetStore
 func NewTweetStore(sc *spanner.Client) TweetStore {
-	if tweetStore == nil {
-		tweetStore = &defaultTweetStore{
-			sc: sc,
-		}
+	if tweetStore != nil {
+		return tweetStore
 	}
-	return tweetStore
+	return &defaultTweetStore{
+		sc: sc,
+	}
 }
 
 // Tweet is TweetTable Row
@@ -409,7 +409,10 @@ func (s *defaultTweetStore) QueryLatestByAuthor(ctx context.Context, author stri
 		row, err := iter.Next()
 		if err == iterator.Done {
 			return results, nil
+		} else if err != nil {
+			return nil, err
 		}
+
 		var t *Tweet
 		if err := row.ToStruct(t); err != nil {
 			return nil, err

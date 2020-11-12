@@ -84,6 +84,30 @@ func TestDefaultTweetStore_Insert(t *testing.T) {
 	}
 }
 
+func TestDefaultTweetStore_QueryLatestByAuthor(t *testing.T) {
+	ctx := context.Background()
+
+	NewTestInstance(t)
+
+	dbName := RandString(8)
+
+	statements := readDDLFile(t, "../ddl/tweet.sql")
+	NewDatabase(t, dbName, statements)
+
+	sc, err := spanner.NewClient(ctx, fmt.Sprintf("projects/fake/instances/fake/databases/%s", dbName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sc.Close()
+
+	ts := NewTweetStore(sc)
+
+	_, err = ts.QueryLatestByAuthor(ctx, "hoge")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 var rs1Letters = []rune("abcdefghijklmnopqrstuvwxyz")
 
 func RandString(n int) string {

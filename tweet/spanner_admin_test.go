@@ -37,6 +37,7 @@ func NewTestInstance(t *testing.T) {
 			// すでに存在するなら、それを使うので、スルー
 			return
 		}
+		t.Fatal(err)
 	}
 	_, err = ope.Wait(ctx)
 	if err != nil {
