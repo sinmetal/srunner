@@ -313,7 +313,7 @@ func (run *RunnerV2) queryTweetLatestByAuthor(ctx context.Context, author string
 
 	var cancel context.CancelFunc
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+		ctx, cancel = context.WithTimeout(ctx, 500*time.Millisecond)
 		defer cancel()
 	}
 
