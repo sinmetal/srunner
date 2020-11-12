@@ -398,7 +398,9 @@ func (s *defaultTweetStore) InsertBench(ctx context.Context, id string) error {
 
 // InsertBench is 複数TableへのInsertを行う
 func (s *defaultTweetStore) QueryLatestByAuthor(ctx context.Context, author string) ([]*Tweet, error) {
-	stm := spanner.NewStatement("SELECT * FROM Tweet WHERE Author = @Author ORDER BY CreatedAt DESC LIMIT @Limit")
+	stm := spanner.NewStatement(
+		`SELECT Id, Author, Content, Count, Favos, Sort, ShardCreatedAt, CreatedAt, UpdatedAt, CommitedAt, SchemaVersion 
+FROM Tweet WHERE Author = @Author ORDER BY CreatedAt DESC LIMIT @Limit`)
 	stm.Params["Author"] = author
 	stm.Params["Limit"] = 50
 
