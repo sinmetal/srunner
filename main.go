@@ -104,6 +104,7 @@ func main() {
 	runnerV2.GoInsertTweet(concurrentReq50PerSec)
 	runnerV2.GoInsertTweetWithOperation(concurrentReq50PerSec)
 	runnerV2.GoUpdateTweet(concurrentReq50PerSec)
+	runnerV2.GoDeleteTweet(1)
 	runnerV2.GoGetTweet(concurrentReq50PerSec)
 	runnerV2.GoQueryTweetLatestByAuthor(1) // 秒間 5回ほど, Author の種類が少ないので、同時実行無しで控えめ
 	//goInsertTweet(ts, env.Goroutine, endCh)

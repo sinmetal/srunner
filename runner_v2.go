@@ -148,7 +148,7 @@ func (run *RunnerV2) GoUpdateTweet(concurrent int) {
 			case <-t.C:
 				ctx := context.Background()
 
-				ids, err := run.ts.QueryResultStruct(ctx, 1000)
+				ids, err := run.ts.QueryResultStruct(ctx, false, 1000)
 				if err != nil {
 					run.endCh <- fmt.Errorf("failed GoUpdateTweet : QueryResultStruct : %w", err)
 				}
@@ -212,6 +212,80 @@ func (run *RunnerV2) updateTweet(ctx context.Context, id string) {
 	}
 }
 
+func (run *RunnerV2) GoDeleteTweet(concurrent int) {
+	idCh := make(chan string, 10000)
+	go func() {
+		t := time.NewTicker(1000 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				ctx := context.Background()
+
+				ids, err := run.ts.QueryResultStruct(ctx, true, 1000)
+				if err != nil {
+					run.endCh <- fmt.Errorf("failed GoDeleteTweet : QueryResultStruct : %w", err)
+				}
+				for _, id := range ids {
+					idCh <- id.ID
+				}
+			}
+		}
+	}()
+
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			t := time.NewTicker(200 * time.Millisecond)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					ctx := context.Background()
+
+					id := <-idCh
+					run.deleteTweet(ctx, id)
+				}
+			}
+		}()
+	}
+}
+
+func (run *RunnerV2) deleteTweet(ctx context.Context, id string) {
+	ctx, span := startSpan(ctx, "goV2/deleteTweet")
+	defer span.End()
+
+	const metricsID = "DELETE TWEET"
+
+	var cancel context.CancelFunc
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+		defer cancel()
+	}
+
+	retCh := make(chan error, 1)
+	go func() {
+		retCh <- run.ts.Delete(ctx, id)
+	}()
+	select {
+	case <-ctx.Done():
+		if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindTimeout); err != nil {
+			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+		}
+	case err := <-retCh:
+		if err != nil {
+			serr := CountSpannerStatus(context.Background(), metricsID, MetricsKindNG)
+			if serr != nil {
+				err = fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
+			}
+			fmt.Printf("failed DeleteTweet : %+v\n", err)
+		} else {
+			if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindOK); err != nil {
+				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+			}
+		}
+	}
+}
+
 func (run *RunnerV2) GoGetTweet(concurrent int) {
 	idCh := make(chan string, 10000)
 	go func() {
@@ -222,7 +296,7 @@ func (run *RunnerV2) GoGetTweet(concurrent int) {
 			case <-t.C:
 				ctx := context.Background()
 
-				ids, err := run.ts.QueryResultStruct(ctx, 1000)
+				ids, err := run.ts.QueryResultStruct(ctx, false, 1000)
 				if err != nil {
 					run.endCh <- fmt.Errorf("failed GoGetTweet : QueryResultStruct : %w", err)
 				}
