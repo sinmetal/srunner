@@ -21,11 +21,12 @@ type TweetStore interface {
 	InsertBench(ctx context.Context, id string) error
 	InsertWithOperation(ctx context.Context, id string) error
 	Update(ctx context.Context, id string) error
+	Delete(ctx context.Context, id string) error
 	Get(ctx context.Context, key spanner.Key) (*Tweet, error)
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
 	QueryHeavy(ctx context.Context) ([]*Tweet, error)
 	QueryAll(ctx context.Context) (int, error)
-	QueryResultStruct(ctx context.Context, limit int) ([]*TweetIDAndAuthor, error)
+	QueryResultStruct(ctx context.Context, orderByAsc bool, limit int) ([]*TweetIDAndAuthor, error)
 	QueryRandom(ctx context.Context) error
 	QueryLatestByAuthor(ctx context.Context, author string) ([]*Tweet, error)
 }
@@ -277,12 +278,24 @@ type TweetIDAndAuthor struct {
 }
 
 // QueryResultStruct is StructをResultで返すQueryのサンプル
-func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, limit int) ([]*TweetIDAndAuthor, error) {
+func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, orderByAsc bool, limit int) ([]*TweetIDAndAuthor, error) {
 	ctx, span := startSpan(ctx, "queryResultStruct")
 	defer span.End()
 
+	sql := `
+SELECT ARRAY(SELECT STRUCT(Id, Author)) As IdWithAuthor 
+FROM Tweet@{FORCE_INDEX=TweetShardCreatedAtAscCreatedAtDesc} 
+WHERE ShardCreatedAt = @ShardCreatedAt
+`
+	if orderByAsc {
+		sql += " ORDER BY CreatedAt"
+	} else {
+		sql += " ORDER BY CreatedAt DESC"
+	}
+	sql += " LIMIT @Limit;"
+
 	shardCreatedAt := rand.Intn(10)
-	st := spanner.NewStatement("SELECT ARRAY(SELECT STRUCT(Id, Author)) As IdWithAuthor FROM Tweet@{FORCE_INDEX=TweetShardCreatedAtAscCreatedAtDesc} WHERE ShardCreatedAt = @ShardCreatedAt LIMIT @Limit;")
+	st := spanner.NewStatement(sql)
 	st.Params["ShardCreatedAt"] = shardCreatedAt
 	st.Params["Limit"] = limit
 	iter := s.sc.Single().Query(ctx, st)
@@ -339,6 +352,18 @@ func (s *defaultTweetStore) Update(ctx context.Context, id string) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed TweetStore.Update : %w", err)
+	}
+	return nil
+}
+
+// Delete is 指定した ID の Row を削除する
+func (s *defaultTweetStore) Delete(ctx context.Context, id string) error {
+	ctx, span := startSpan(ctx, "delete")
+	defer span.End()
+
+	_, err := s.sc.Apply(ctx, []*spanner.Mutation{spanner.Delete(s.TableName(), spanner.Key{id})})
+	if err != nil {
+		return err
 	}
 	return nil
 }
