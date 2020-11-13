@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
@@ -109,12 +108,6 @@ func main() {
 	runnerV2.GoGetTweet(concurrentReq50PerSec)
 	runnerV2.GoQueryTweetLatestByAuthor(1) // 秒間 5回ほど, Author の種類が少ないので、同時実行無しで控えめ
 
-	go func() {
-		for {
-			log.Info(ctx, "Hello Srunner Log")
-			time.Sleep(10 * time.Second)
-		}
-	}()
 	//goInsertTweet(ts, env.Goroutine, endCh)
 	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	// goInsertTweetWithFCFS(ts, env.Goroutine, endCh)

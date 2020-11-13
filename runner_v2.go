@@ -9,12 +9,35 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
+	"github.com/sinmetal/srunner/log"
 	"github.com/sinmetal/srunner/tweet"
+	"golang.org/x/xerrors"
 )
 
 type RunnerV2 struct {
 	ts    tweet.TweetStore
 	endCh chan<- error
+}
+
+func (run *RunnerV2) outputMetrics(ctx context.Context, metricsID string, err error) {
+	if ctx.Err() == context.DeadlineExceeded || xerrors.Is(err, context.DeadlineExceeded) {
+		if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindTimeout); err != nil {
+			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+		}
+		return
+	}
+	if err != nil {
+		log.Error(ctx, fmt.Sprintf("failed %s : %+v\n", metricsID, err))
+		serr := CountSpannerStatus(context.Background(), metricsID, MetricsKindNG)
+		if serr != nil {
+			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
+		}
+		return
+	}
+
+	if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindOK); err != nil {
+		run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
+	}
 }
 
 func (run *RunnerV2) GoInsertTweet(concurrent int) {
@@ -66,21 +89,9 @@ func (run *RunnerV2) insertTweet(ctx context.Context, id string) {
 	}()
 	select {
 	case <-ctx.Done():
-		if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindTimeout); err != nil {
-			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-		}
+		run.outputMetrics(ctx, metricsID, nil)
 	case err := <-retCh:
-		if err != nil {
-			fmt.Printf("failed InsertTweet : %+v\n", err)
-			serr := CountSpannerStatus(context.Background(), metricsID, MetricsKindNG)
-			if serr != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
-			}
-		} else {
-			if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindOK); err != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-			}
-		}
+		run.outputMetrics(ctx, metricsID, err)
 	}
 }
 
@@ -120,21 +131,9 @@ func (run *RunnerV2) insertTweetWithOperation(ctx context.Context, id string) {
 	}()
 	select {
 	case <-ctx.Done():
-		if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindTimeout); err != nil {
-			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-		}
+		run.outputMetrics(ctx, metricsID, nil)
 	case err := <-retCh:
-		if err != nil {
-			fmt.Printf("failed InsertWithOperationTweet : %+v\n", err)
-			serr := CountSpannerStatus(context.Background(), metricsID, MetricsKindNG)
-			if serr != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
-			}
-		} else {
-			if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindOK); err != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-			}
-		}
+		run.outputMetrics(ctx, metricsID, err)
 	}
 }
 
@@ -194,21 +193,9 @@ func (run *RunnerV2) updateTweet(ctx context.Context, id string) {
 	}()
 	select {
 	case <-ctx.Done():
-		if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindTimeout); err != nil {
-			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-		}
+		run.outputMetrics(ctx, metricsID, nil)
 	case err := <-retCh:
-		if err != nil {
-			fmt.Printf("failed UpdateTweet : %+v\n", err)
-			serr := CountSpannerStatus(context.Background(), metricsID, MetricsKindNG)
-			if serr != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
-			}
-		} else {
-			if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindOK); err != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-			}
-		}
+		run.outputMetrics(ctx, metricsID, err)
 	}
 }
 
@@ -268,21 +255,9 @@ func (run *RunnerV2) deleteTweet(ctx context.Context, id string) {
 	}()
 	select {
 	case <-ctx.Done():
-		if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindTimeout); err != nil {
-			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-		}
+		run.outputMetrics(ctx, metricsID, nil)
 	case err := <-retCh:
-		if err != nil {
-			fmt.Printf("failed DeleteTweet : %+v\n", err)
-			serr := CountSpannerStatus(context.Background(), metricsID, MetricsKindNG)
-			if serr != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
-			}
-		} else {
-			if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindOK); err != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-			}
-		}
+		run.outputMetrics(ctx, metricsID, err)
 	}
 }
 
@@ -343,21 +318,9 @@ func (run *RunnerV2) getTweet(ctx context.Context, id string) {
 	}()
 	select {
 	case <-ctx.Done():
-		if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindTimeout); err != nil {
-			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-		}
+		run.outputMetrics(ctx, metricsID, nil)
 	case err := <-retCh:
-		if err != nil {
-			fmt.Printf("failed GetTweet : %+v\n", err)
-			serr := CountSpannerStatus(context.Background(), metricsID, MetricsKindNG)
-			if serr != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
-			}
-		} else {
-			if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindOK); err != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-			}
-		}
+		run.outputMetrics(ctx, metricsID, err)
 	}
 }
 
@@ -398,20 +361,8 @@ func (run *RunnerV2) queryTweetLatestByAuthor(ctx context.Context, author string
 	}()
 	select {
 	case <-ctx.Done():
-		if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindTimeout); err != nil {
-			run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-		}
+		run.outputMetrics(ctx, metricsID, nil)
 	case err := <-retCh:
-		if err != nil {
-			fmt.Printf("failed QueryLatestByAuthor : %+v\n", err)
-			serr := CountSpannerStatus(context.Background(), metricsID, MetricsKindNG)
-			if serr != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", serr)
-			}
-		} else {
-			if err := CountSpannerStatus(context.Background(), metricsID, MetricsKindOK); err != nil {
-				run.endCh <- fmt.Errorf("failed stats.CountSpannerStatus : %w", err)
-			}
-		}
+		run.outputMetrics(ctx, metricsID, err)
 	}
 }
