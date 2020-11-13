@@ -27,6 +27,7 @@ type TweetStore interface {
 	QueryHeavy(ctx context.Context) ([]*Tweet, error)
 	QueryAll(ctx context.Context) (int, error)
 	QueryResultStruct(ctx context.Context, orderByAsc bool, limit int) ([]*TweetIDAndAuthor, error)
+	QueryOrderByCreatedAtDesc(ctx context.Context, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error)
 	QueryRandom(ctx context.Context) error
 	QueryLatestByAuthor(ctx context.Context, author string) ([]*Tweet, error)
 }
@@ -323,6 +324,58 @@ WHERE ShardCreatedAt = @ShardCreatedAt
 	}
 
 	return ias, nil
+}
+
+type PageOptionForQueryOrderByCreatedAtDesc struct {
+	ID        string
+	CreatedAt time.Time
+}
+
+// QueryResultStruct is StructをResultで返すQueryのサンプル
+func (s *defaultTweetStore) QueryOrderByCreatedAtDesc(ctx context.Context, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error) {
+	ctx, span := startSpan(ctx, "queryOrderByCreatedAtDesc")
+	defer span.End()
+
+	sql := `
+SELECT c.Id, c.Author, c.Content, c.Count, c.Favos, c.Sort, c.ShardCreatedAt, c.CreatedAt, c.UpdatedAt, c.CommitedAt, c.SchemaVersion 
+FROM UNNEST(GENERATE_ARRAY(0, 9)) AS OneShardCreatedAt,
+     UNNEST(ARRAY(
+      SELECT AS STRUCT *
+      FROM Tweet@{FORCE_INDEX=TweetShardCreatedAtAscCreatedAtDesc} 
+      WHERE ShardCreatedAt = OneShardCreatedAt
+        AND (CreatedAt < @CreatedAt) 
+          OR (CreatedAt = @CreatedAt AND Id > @Id)
+      ORDER BY CreatedAt DESC LIMIT @Limit
+    )) AS c
+ORDER BY c.CreatedAt DESC, Id
+LIMIT @Limit
+`
+
+	st := spanner.NewStatement(sql)
+	st.Params["CreatedAt"] = pageOption.CreatedAt
+	st.Params["Id"] = pageOption.ID
+	st.Params["Limit"] = limit
+	iter := s.sc.Single().Query(ctx, st)
+	defer iter.Stop()
+
+	ts := []*Tweet{}
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed spanner.Iterator.Next : %w", err)
+		}
+
+		var t Tweet
+		if err := row.ToStruct(&t); err != nil {
+			return nil, fmt.Errorf("failed spanner.Row.ToStruct : %w", err)
+		}
+		ts = append(ts, &t)
+	}
+
+	return ts, nil
 }
 
 func (s *defaultTweetStore) Update(ctx context.Context, id string) error {

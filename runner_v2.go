@@ -138,21 +138,40 @@ func (run *RunnerV2) insertTweetWithOperation(ctx context.Context, id string) {
 }
 
 func (run *RunnerV2) GoUpdateTweet(concurrent int) {
+	const limit = 1000
 	idCh := make(chan string, 10000)
 	go func() {
 		t := time.NewTicker(1000 * time.Millisecond)
 		defer t.Stop()
+
+		last := &tweet.PageOptionForQueryOrderByCreatedAtDesc{
+			ID:        "",
+			CreatedAt: time.Now(),
+		}
 		for {
 			select {
 			case <-t.C:
 				ctx := context.Background()
 
-				ids, err := run.ts.QueryResultStruct(ctx, false, 1000)
+				tlist, err := run.ts.QueryOrderByCreatedAtDesc(ctx, last, limit)
 				if err != nil {
 					run.endCh <- fmt.Errorf("failed GoUpdateTweet : QueryResultStruct : %w", err)
 				}
-				for _, id := range ids {
-					idCh <- id.ID
+				for _, t := range tlist {
+					idCh <- t.ID
+				}
+
+				if len(tlist) < limit {
+					// 末尾 (最も古いデータまでいったら、先頭付近に戻る)
+					last = &tweet.PageOptionForQueryOrderByCreatedAtDesc{
+						ID:        "",
+						CreatedAt: time.Now(),
+					}
+					continue
+				}
+				last = &tweet.PageOptionForQueryOrderByCreatedAtDesc{
+					ID:        tlist[len(tlist)-1].ID,
+					CreatedAt: tlist[len(tlist)-1].CreatedAt,
 				}
 			}
 		}
