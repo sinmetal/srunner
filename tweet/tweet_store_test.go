@@ -123,6 +123,61 @@ func TestDefaultTweetStore_QueryLatestByAuthor(t *testing.T) {
 	}
 }
 
+func TestDefaultTweetStore_QueryOrderByCreatedAtDesc(t *testing.T) {
+	ctx := context.Background()
+
+	NewTestInstance(t)
+
+	dbName := RandString(8)
+
+	statements := readDDLFile(t, "../ddl/tweet.sql")
+	NewDatabase(t, dbName, statements)
+
+	sc, err := spanner.NewClient(ctx, fmt.Sprintf("projects/fake/instances/fake/databases/%s", dbName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sc.Close()
+
+	ts := NewTweetStore(sc)
+	for i := 0; i < 100; i++ {
+		now := time.Now()
+		if err := ts.Insert(ctx, &Tweet{
+			ID:             fmt.Sprintf("%d", i),
+			Author:         "sinmetal",
+			Content:        "hello world",
+			Count:          0,
+			Favos:          []string{},
+			Sort:           0,
+			ShardCreatedAt: 0,
+			CreatedAt:      now,
+			UpdatedAt:      now,
+			CommitedAt:     spanner.CommitTimestamp,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tlist, err := ts.QueryOrderByCreatedAtDesc(ctx, &PageOptionForQueryOrderByCreatedAtDesc{
+		ID:        "",
+		CreatedAt: time.Now(),
+	}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ts.QueryOrderByCreatedAtDesc(ctx, &PageOptionForQueryOrderByCreatedAtDesc{
+		ID:        tlist[len(tlist)-1].ID,
+		CreatedAt: tlist[len(tlist)-1].CreatedAt,
+	}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].ID != "89" {
+		t.Errorf("Desc で 11 番目だから、89 だと思ったのに！？ : %s", got[0].ID)
+	}
+}
+
 var rs1Letters = []rune("abcdefghijklmnopqrstuvwxyz")
 
 func RandString(n int) string {
