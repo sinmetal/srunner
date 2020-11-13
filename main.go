@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/google/uuid"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/sinmetal/srunner/log"
 	"github.com/sinmetal/srunner/tweet"
 	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 	"go.opencensus.io/trace"
@@ -26,11 +27,13 @@ type EnvConfig struct {
 }
 
 func main() {
+	ctx := context.Background()
+
 	var env EnvConfig
 	if err := envconfig.Process("srunner", &env); err != nil {
-		log.Fatal(err.Error())
+		log.Fatal(ctx, err.Error())
 	}
-	log.Printf("ENV_CONFIG %+v\n", env)
+	log.Info(ctx, fmt.Sprintf("ENV_CONFIG %+v\n", env))
 
 	tracePrefix = env.TracePrefix
 
@@ -63,8 +66,6 @@ func main() {
 			panic(err)
 		}
 	}
-
-	ctx := context.Background()
 
 	// Need to specify scope for the specific service.
 	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, spanner.Scope)
@@ -107,6 +108,13 @@ func main() {
 	runnerV2.GoDeleteTweet(1)
 	runnerV2.GoGetTweet(concurrentReq50PerSec)
 	runnerV2.GoQueryTweetLatestByAuthor(1) // 秒間 5回ほど, Author の種類が少ないので、同時実行無しで控えめ
+
+	go func() {
+		for {
+			log.Info(ctx, "Hello Srunner Log")
+			time.Sleep(10 * time.Second)
+		}
+	}()
 	//goInsertTweet(ts, env.Goroutine, endCh)
 	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	// goInsertTweetWithFCFS(ts, env.Goroutine, endCh)
