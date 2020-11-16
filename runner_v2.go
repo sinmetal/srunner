@@ -14,6 +14,10 @@ import (
 	"golang.org/x/xerrors"
 )
 
+const (
+	defaultTimeoutDuration = 3000 * time.Millisecond
+)
+
 type RunnerV2 struct {
 	ts    tweet.TweetStore
 	endCh chan<- error
@@ -66,7 +70,7 @@ func (run *RunnerV2) insertTweet(ctx context.Context, id string) {
 
 	var cancel context.CancelFunc
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeoutDuration)
 		defer cancel()
 	}
 
@@ -121,7 +125,7 @@ func (run *RunnerV2) insertTweetWithOperation(ctx context.Context, id string) {
 
 	var cancel context.CancelFunc
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeoutDuration)
 		defer cancel()
 	}
 
@@ -202,7 +206,7 @@ func (run *RunnerV2) updateTweet(ctx context.Context, id string) {
 
 	var cancel context.CancelFunc
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeoutDuration)
 		defer cancel()
 	}
 
@@ -264,7 +268,7 @@ func (run *RunnerV2) deleteTweet(ctx context.Context, id string) {
 
 	var cancel context.CancelFunc
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeoutDuration)
 		defer cancel()
 	}
 
@@ -326,7 +330,7 @@ func (run *RunnerV2) getTweet(ctx context.Context, id string) {
 
 	var cancel context.CancelFunc
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		ctx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeoutDuration)
 		defer cancel()
 	}
 
@@ -369,7 +373,7 @@ func (run *RunnerV2) queryTweetLatestByAuthor(ctx context.Context, author string
 
 	var cancel context.CancelFunc
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		ctx, cancel = context.WithTimeout(ctx, 500*time.Millisecond)
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeoutDuration)
 		defer cancel()
 	}
 
