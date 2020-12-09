@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	exactStaleness30sec = spanner.ExactStaleness(30 * time.Second)
+	exactStaleness30sec = spanner.MaxStaleness(30 * time.Second)
 )
 
 type RunnerV2 struct {
