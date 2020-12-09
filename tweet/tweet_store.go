@@ -26,10 +26,10 @@ type TweetStore interface {
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
 	QueryHeavy(ctx context.Context) ([]*Tweet, error)
 	QueryAll(ctx context.Context) (int, error)
-	QueryResultStruct(ctx context.Context, orderByAsc bool, limit int) ([]*TweetIDAndAuthor, error)
+	QueryResultStruct(ctx context.Context, orderByAsc bool, limit int, tb *spanner.TimestampBound) ([]*TweetIDAndAuthor, error)
 	QueryOrderByCreatedAtDesc(ctx context.Context, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error)
 	QueryRandom(ctx context.Context) error
-	QueryLatestByAuthor(ctx context.Context, author string) ([]*Tweet, error)
+	QueryLatestByAuthor(ctx context.Context, author string, tb *spanner.TimestampBound) ([]*Tweet, error)
 }
 
 var tweetStore TweetStore
@@ -279,7 +279,7 @@ type TweetIDAndAuthor struct {
 }
 
 // QueryResultStruct is StructをResultで返すQueryのサンプル
-func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, orderByAsc bool, limit int) ([]*TweetIDAndAuthor, error) {
+func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, orderByAsc bool, limit int, timestampBound *spanner.TimestampBound) ([]*TweetIDAndAuthor, error) {
 	ctx, span := startSpan(ctx, "queryResultStruct")
 	defer span.End()
 
@@ -299,7 +299,12 @@ WHERE ShardCreatedAt = @ShardCreatedAt
 	st := spanner.NewStatement(sql)
 	st.Params["ShardCreatedAt"] = shardCreatedAt
 	st.Params["Limit"] = limit
-	iter := s.sc.Single().Query(ctx, st)
+	roTx := s.sc.Single()
+	if timestampBound != nil {
+		roTx = roTx.WithTimestampBound(*timestampBound)
+	}
+
+	iter := roTx.Query(ctx, st)
 	defer iter.Stop()
 
 	type Result struct {
@@ -475,7 +480,7 @@ func (s *defaultTweetStore) InsertBench(ctx context.Context, id string) error {
 }
 
 // InsertBench is 複数TableへのInsertを行う
-func (s *defaultTweetStore) QueryLatestByAuthor(ctx context.Context, author string) ([]*Tweet, error) {
+func (s *defaultTweetStore) QueryLatestByAuthor(ctx context.Context, author string, tb *spanner.TimestampBound) ([]*Tweet, error) {
 	stm := spanner.NewStatement(
 		`SELECT Id, Author, Content, Count, Favos, Sort, ShardCreatedAt, CreatedAt, UpdatedAt, CommitedAt, SchemaVersion 
 FROM Tweet WHERE Author = @Author ORDER BY CreatedAt DESC LIMIT @Limit`)
@@ -483,7 +488,11 @@ FROM Tweet WHERE Author = @Author ORDER BY CreatedAt DESC LIMIT @Limit`)
 	stm.Params["Limit"] = 50
 
 	var results []*Tweet
-	iter := s.sc.Single().Query(ctx, stm)
+	roTx := s.sc.Single()
+	if tb != nil {
+		roTx = roTx.WithTimestampBound(*tb)
+	}
+	iter := roTx.Query(ctx, stm)
 	defer iter.Stop()
 	for {
 		row, err := iter.Next()
