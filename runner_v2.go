@@ -18,6 +18,10 @@ const (
 	defaultTimeoutDuration = 3000 * time.Millisecond
 )
 
+var (
+	exactStaleness30sec = spanner.ExactStaleness(30 * time.Second)
+)
+
 type RunnerV2 struct {
 	ts    tweet.TweetStore
 	endCh chan<- error
@@ -232,7 +236,7 @@ func (run *RunnerV2) GoDeleteTweet(concurrent int) {
 			case <-t.C:
 				ctx := context.Background()
 
-				ids, err := run.ts.QueryResultStruct(ctx, true, 1000)
+				ids, err := run.ts.QueryResultStruct(ctx, true, 1000, &exactStaleness30sec)
 				if err != nil {
 					run.endCh <- fmt.Errorf("failed GoDeleteTweet : QueryResultStruct : %w", err)
 				}
@@ -294,7 +298,7 @@ func (run *RunnerV2) GoGetTweet(concurrent int) {
 			case <-t.C:
 				ctx := context.Background()
 
-				ids, err := run.ts.QueryResultStruct(ctx, false, 1000)
+				ids, err := run.ts.QueryResultStruct(ctx, false, 1000, &exactStaleness30sec)
 				if err != nil {
 					run.endCh <- fmt.Errorf("failed GoGetTweet : QueryResultStruct : %w", err)
 				}
@@ -379,7 +383,7 @@ func (run *RunnerV2) queryTweetLatestByAuthor(ctx context.Context, author string
 
 	retCh := make(chan error, 1)
 	go func() {
-		_, err := run.ts.QueryLatestByAuthor(ctx, author)
+		_, err := run.ts.QueryLatestByAuthor(ctx, author, &exactStaleness30sec)
 		retCh <- err
 	}()
 	select {
