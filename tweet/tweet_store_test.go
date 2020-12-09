@@ -117,7 +117,7 @@ func TestDefaultTweetStore_QueryLatestByAuthor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = ts.QueryLatestByAuthor(ctx, "sinmetal")
+	_, err = ts.QueryLatestByAuthor(ctx, "sinmetal", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
