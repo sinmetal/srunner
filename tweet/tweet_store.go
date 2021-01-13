@@ -19,25 +19,29 @@ type TweetStore interface {
 	TableName() string
 	Insert(ctx context.Context, tweet *Tweet) error
 	InsertBench(ctx context.Context, id string) error
+	InsertWithOperation(ctx context.Context, id string) error
 	Update(ctx context.Context, id string) error
+	Delete(ctx context.Context, id string) error
 	Get(ctx context.Context, key spanner.Key) (*Tweet, error)
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
 	QueryHeavy(ctx context.Context) ([]*Tweet, error)
 	QueryAll(ctx context.Context) (int, error)
-	QueryResultStruct(ctx context.Context, limit int) ([]*TweetIDAndAuthor, error)
+	QueryResultStruct(ctx context.Context, orderByAsc bool, limit int, tb *spanner.TimestampBound) ([]*TweetIDAndAuthor, error)
+	QueryOrderByCreatedAtDesc(ctx context.Context, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error)
 	QueryRandom(ctx context.Context) error
+	QueryLatestByAuthor(ctx context.Context, author string, tb *spanner.TimestampBound) ([]*Tweet, error)
 }
 
 var tweetStore TweetStore
 
 // NewTweetStore is New TweetStore
 func NewTweetStore(sc *spanner.Client) TweetStore {
-	if tweetStore == nil {
-		tweetStore = &defaultTweetStore{
-			sc: sc,
-		}
+	if tweetStore != nil {
+		return tweetStore
 	}
-	return tweetStore
+	return &defaultTweetStore{
+		sc: sc,
+	}
 }
 
 // Tweet is TweetTable Row
@@ -52,6 +56,7 @@ type Tweet struct {
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	CommitedAt     time.Time
+	SchemaVersion  int64
 }
 
 type defaultTweetStore struct {
@@ -82,6 +87,43 @@ func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) error {
 	}
 
 	return nil
+}
+
+// InsertWithOperation is Tweet Table と Operation Table に Insertを行う
+func (s *defaultTweetStore) InsertWithOperation(ctx context.Context, id string) error {
+	ctx, span := startSpan(ctx, "insertWithOperation")
+	defer span.End()
+
+	ml := []*spanner.Mutation{}
+	now := time.Now()
+
+	shardId := crc32.ChecksumIEEE([]byte(now.String())) % 10
+	t := &Tweet{
+		ID:             id,
+		Content:        id,
+		Favos:          []string{},
+		ShardCreatedAt: int64(shardId),
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		CommitedAt:     spanner.CommitTimestamp,
+	}
+	tm, err := spanner.InsertStruct(s.TableName(), t)
+	if err != nil {
+		return err
+	}
+	ml = append(ml, tm)
+
+	tom, err := operation.NewOperationInsertMutation(uuid.New().String(), "INSERT", "", s.TableName(), t)
+	if err != nil {
+		return err
+	}
+	ml = append(ml, tom)
+
+	_, err = s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		return txn.BufferWrite(ml)
+	})
+
+	return err
 }
 
 func (s *defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, error) {
@@ -237,15 +279,32 @@ type TweetIDAndAuthor struct {
 }
 
 // QueryResultStruct is StructをResultで返すQueryのサンプル
-func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, limit int) ([]*TweetIDAndAuthor, error) {
+func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, orderByAsc bool, limit int, timestampBound *spanner.TimestampBound) ([]*TweetIDAndAuthor, error) {
 	ctx, span := startSpan(ctx, "queryResultStruct")
 	defer span.End()
 
+	sql := `
+SELECT ARRAY(SELECT STRUCT(Id, Author)) As IdWithAuthor 
+FROM Tweet@{FORCE_INDEX=TweetShardCreatedAtAscCreatedAtDesc} 
+WHERE ShardCreatedAt = @ShardCreatedAt
+`
+	if orderByAsc {
+		sql += " ORDER BY CreatedAt"
+	} else {
+		sql += " ORDER BY CreatedAt DESC"
+	}
+	sql += " LIMIT @Limit;"
+
 	shardCreatedAt := rand.Intn(10)
-	st := spanner.NewStatement("SELECT ARRAY(SELECT STRUCT(Id, Author)) As IdWithAuthor FROM Tweet@{FORCE_INDEX=TweetShardCreatedAtAscCreatedAtDesc} WHERE ShardCreatedAt = @ShardCreatedAt LIMIT @Limit;")
+	st := spanner.NewStatement(sql)
 	st.Params["ShardCreatedAt"] = shardCreatedAt
 	st.Params["Limit"] = limit
-	iter := s.sc.Single().Query(ctx, st)
+	roTx := s.sc.Single()
+	if timestampBound != nil {
+		roTx = roTx.WithTimestampBound(*timestampBound)
+	}
+
+	iter := roTx.Query(ctx, st)
 	defer iter.Stop()
 
 	type Result struct {
@@ -270,6 +329,58 @@ func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, limit int) ([
 	}
 
 	return ias, nil
+}
+
+type PageOptionForQueryOrderByCreatedAtDesc struct {
+	ID        string
+	CreatedAt time.Time
+}
+
+// QueryResultStruct is StructをResultで返すQueryのサンプル
+func (s *defaultTweetStore) QueryOrderByCreatedAtDesc(ctx context.Context, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error) {
+	ctx, span := startSpan(ctx, "queryOrderByCreatedAtDesc")
+	defer span.End()
+
+	sql := `
+SELECT c.Id, c.Author, c.Content, c.Count, c.Favos, c.Sort, c.ShardCreatedAt, c.CreatedAt, c.UpdatedAt, c.CommitedAt, c.SchemaVersion 
+FROM UNNEST(GENERATE_ARRAY(0, 9)) AS OneShardCreatedAt,
+     UNNEST(ARRAY(
+      SELECT AS STRUCT *
+      FROM Tweet@{FORCE_INDEX=TweetShardCreatedAtAscCreatedAtDesc} 
+      WHERE ShardCreatedAt = OneShardCreatedAt
+        AND (CreatedAt < @CreatedAt) 
+          OR (CreatedAt = @CreatedAt AND Id > @Id)
+      ORDER BY CreatedAt DESC LIMIT @Limit
+    )) AS c
+ORDER BY c.CreatedAt DESC, Id
+LIMIT @Limit
+`
+
+	st := spanner.NewStatement(sql)
+	st.Params["CreatedAt"] = pageOption.CreatedAt
+	st.Params["Id"] = pageOption.ID
+	st.Params["Limit"] = limit
+	iter := s.sc.Single().Query(ctx, st)
+	defer iter.Stop()
+
+	ts := []*Tweet{}
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed spanner.Iterator.Next : %w", err)
+		}
+
+		var t Tweet
+		if err := row.ToStruct(&t); err != nil {
+			return nil, fmt.Errorf("failed spanner.Row.ToStruct : %w", err)
+		}
+		ts = append(ts, &t)
+	}
+
+	return ts, nil
 }
 
 func (s *defaultTweetStore) Update(ctx context.Context, id string) error {
@@ -299,6 +410,18 @@ func (s *defaultTweetStore) Update(ctx context.Context, id string) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed TweetStore.Update : %w", err)
+	}
+	return nil
+}
+
+// Delete is 指定した ID の Row を削除する
+func (s *defaultTweetStore) Delete(ctx context.Context, id string) error {
+	ctx, span := startSpan(ctx, "delete")
+	defer span.End()
+
+	_, err := s.sc.Apply(ctx, []*spanner.Mutation{spanner.Delete(s.TableName(), spanner.Key{id})})
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -354,4 +477,35 @@ func (s *defaultTweetStore) InsertBench(ctx context.Context, id string) error {
 	})
 
 	return err
+}
+
+// InsertBench is 複数TableへのInsertを行う
+func (s *defaultTweetStore) QueryLatestByAuthor(ctx context.Context, author string, tb *spanner.TimestampBound) ([]*Tweet, error) {
+	stm := spanner.NewStatement(
+		`SELECT Id, Author, Content, Count, Favos, Sort, ShardCreatedAt, CreatedAt, UpdatedAt, CommitedAt, SchemaVersion 
+FROM Tweet WHERE Author = @Author ORDER BY CreatedAt DESC LIMIT @Limit`)
+	stm.Params["Author"] = author
+	stm.Params["Limit"] = 50
+
+	var results []*Tweet
+	roTx := s.sc.Single()
+	if tb != nil {
+		roTx = roTx.WithTimestampBound(*tb)
+	}
+	iter := roTx.Query(ctx, stm)
+	defer iter.Stop()
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			return results, nil
+		} else if err != nil {
+			return nil, err
+		}
+
+		t := &Tweet{}
+		if err := row.ToStruct(t); err != nil {
+			return nil, err
+		}
+		results = append(results, t)
+	}
 }

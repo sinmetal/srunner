@@ -9,9 +9,9 @@ service google-fluentd restart
 
 # Your Task
 echo "Start Task!"
-export SRUNNER_SPANNERDATABASE="projects/souzoh-spanner-dev/instances/souzoh-shared-instance/databases/sinmetal"
+export SRUNNER_SPANNERDATABASE="projects/mercari-spanner-dev/instances/souzoh-shared-instance/databases/sinmetal"
 
-gsutil cp gs://bin-kouzoh-p-sinmetal/srunner.bin .
+gsutil cp gs://bin-mercari-p-sinmetal/srunner.bin .
 sudo chmod +x ./srunner.bin
 ./srunner.bin
 echo "DONE Task!"

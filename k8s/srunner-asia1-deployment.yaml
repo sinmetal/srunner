@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: srunner-asia1-dep
+  labels:
+    app: srunner-asia1-dep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: srunner-asia1-dep
+  template:
+    metadata:
+      labels:
+        app: srunner-asia1-dep
+    spec:
+      containers:
+        - name: srunner-asia1-dep
+          image: gcr.io/mercari-p-sinmetal/sinmetal/srunner/runner-v2:efb597470a2a66105dcc786b955eefbf24ddd5e2
+          envFrom:
+            - configMapRef:
+                name: srunner-asia1-config
+          resources:
+            limits:
+              cpu: "2"
+            requests:
+              cpu: "1"

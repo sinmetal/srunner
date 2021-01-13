@@ -287,7 +287,7 @@ func goUpdateTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 			time.Sleep(time.Duration(rand.Intn(600000)) * time.Millisecond)
 
 			ctx := context.Background()
-			ids, err := ts.QueryResultStruct(ctx, goroutine)
+			ids, err := ts.QueryResultStruct(ctx, false, goroutine, nil)
 			if err != nil {
 				endCh <- err
 			}
@@ -359,7 +359,7 @@ func goUpdateTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 	go func() {
 		for {
 			ctx := context.Background()
-			ids, err := ts.QueryResultStruct(ctx, goroutine)
+			ids, err := ts.QueryResultStruct(ctx, false, goroutine, nil)
 			if err != nil {
 				endCh <- err
 			}
@@ -415,7 +415,7 @@ func goGetExitsTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 					defer wg.Done()
 					ctx := context.Background()
 
-					ids, err := ts.QueryResultStruct(ctx, 10)
+					ids, err := ts.QueryResultStruct(ctx, false, 10, nil)
 					if err != nil {
 						endCh <- err
 					}
@@ -486,7 +486,7 @@ func goGetExitsTweetFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- error)
 					defer wg.Done()
 					ctx := context.Background()
 
-					ids, err := ts.QueryResultStruct(ctx, 10)
+					ids, err := ts.QueryResultStruct(ctx, false, 10, nil)
 					if err != nil {
 						endCh <- err
 					}
