@@ -100,12 +100,13 @@ func main() {
 	// 秒間 50 Requestにするための concurrent count
 	// 200 ms ごとに実行されるので、default は秒間 5, なので、concurrent は 10 になる
 	const concurrentReq50PerSec = 10
+	const concurrentReq5PerSec = 1
 
-	runnerV2.GoInsertTweet(concurrentReq50PerSec)
-	runnerV2.GoInsertTweetWithOperation(concurrentReq50PerSec)
-	runnerV2.GoUpdateTweet(concurrentReq50PerSec)
-	runnerV2.GoDeleteTweet(1)
-	runnerV2.GoGetTweet(concurrentReq50PerSec)
+	runnerV2.GoInsertTweet(concurrentReq5PerSec)
+	runnerV2.GoInsertTweetWithOperation(concurrentReq5PerSec)
+	runnerV2.GoUpdateTweet(concurrentReq5PerSec)
+	runnerV2.GoDeleteTweet(concurrentReq50PerSec)
+	runnerV2.GoGetTweet(concurrentReq5PerSec)
 	runnerV2.GoQueryTweetLatestByAuthor(1) // 秒間 5回ほど, Author の種類が少ないので、同時実行無しで控えめ
 
 	//goInsertTweet(ts, env.Goroutine, endCh)
