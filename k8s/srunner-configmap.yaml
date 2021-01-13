@@ -5,3 +5,4 @@ metadata:
 data:
   SRUNNER_SPANNERDATABASE: projects/{project-id}/instances/{instance-id}/databases/{database}
   SRUNNER_GOROUTINE: "30"
+  SRUNNER_TRACEPREFIX: "tokyo"
