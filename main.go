@@ -67,7 +67,7 @@ func main() {
 	}
 
 	// Need to specify scope for the specific service.
-	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, spanner.Scope)
+	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, "https://www.googleapis.com/auth/spanner.data")
 	if err != nil {
 		panic(err)
 	}
@@ -75,12 +75,14 @@ func main() {
 	if err := spanner.EnableStatViews(); err != nil {
 		panic(err)
 	}
+
 	sc, err := createClient(ctx, env.SpannerDatabase,
 		option.WithGRPCDialOption(
 			grpc.WithTransportCredentials(&wrapTransportCredentials{
 				TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
 			}),
 		),
+		option.WithGRPCDialOption(grpc.WithUnaryInterceptor(GFEMetricsUnaryClientInterceptor())),
 		option.WithTokenSource(tokenSource),
 	)
 	if err != nil {
