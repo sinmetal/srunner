@@ -66,6 +66,18 @@ func TestGFEMetricsStreamClientInterceptor(t *testing.T) {
 
 func requestToSpanner(ctx context.Context, t *testing.T, sc *spanner.Client) {
 	_, err := sc.ReadWriteTransaction(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
+		keys := spanner.KeySetFromKeys(spanner.Key{"000008f7-b5a3-4ada-8852-f5bf63f9e8ef"})
+		iter := tx.Read(ctx, "Measure", keys, []string{"ID"})
+		defer iter.Stop()
+		for {
+			_, err := iter.Next()
+			if err == iterator.Done {
+				break
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		}
+
 		v := &Measure{
 			ID:         uuid.New().String(),
 			CommitedAt: spanner.CommitTimestamp,
