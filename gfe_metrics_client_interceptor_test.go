@@ -14,7 +14,6 @@ import (
 	"google.golang.org/api/option"
 	spannerpb "google.golang.org/genproto/googleapis/spanner/v1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -81,11 +80,6 @@ func TestGFEMetricsClientInterceptor(t *testing.T) {
 	}
 
 	sc, err := createClient(ctx, gcpugPublicSpannerDB,
-		option.WithGRPCDialOption(
-			grpc.WithTransportCredentials(&wrapTransportCredentials{
-				TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
-			}),
-		),
 		option.WithGRPCDialOption(grpc.WithUnaryInterceptor(GFEMetricsUnaryClientInterceptor())),
 		option.WithGRPCDialOption(grpc.WithStreamInterceptor(GFEMetricsStreamClientInterceptor())),
 		option.WithTokenSource(tokenSource))
