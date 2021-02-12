@@ -67,7 +67,7 @@ func main() {
 	}
 
 	// Need to specify scope for the specific service.
-	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, "https://www.googleapis.com/auth/spanner.data")
+	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, spanner.Scope)
 	if err != nil {
 		panic(err)
 	}
