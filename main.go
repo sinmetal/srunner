@@ -14,7 +14,6 @@ import (
 	"go.opencensus.io/trace"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 const Service = "srunner"
@@ -77,11 +76,6 @@ func main() {
 	}
 
 	sc, err := createClient(ctx, env.SpannerDatabase,
-		option.WithGRPCDialOption(
-			grpc.WithTransportCredentials(&wrapTransportCredentials{
-				TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
-			}),
-		),
 		option.WithGRPCDialOption(grpc.WithUnaryInterceptor(GFEMetricsUnaryClientInterceptor())),
 		option.WithGRPCDialOption(grpc.WithStreamInterceptor(GFEMetricsStreamClientInterceptor())),
 		option.WithTokenSource(tokenSource),
