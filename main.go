@@ -12,9 +12,6 @@ import (
 	"github.com/sinmetal/srunner/tweet"
 	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 	"go.opencensus.io/trace"
-	"google.golang.org/api/option"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 const Service = "srunner"
@@ -66,23 +63,10 @@ func main() {
 		}
 	}
 
-	// Need to specify scope for the specific service.
-	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, spanner.Scope)
-	if err != nil {
-		panic(err)
-	}
-
 	if err := spanner.EnableStatViews(); err != nil {
 		panic(err)
 	}
-	sc, err := createClient(ctx, env.SpannerDatabase,
-		option.WithGRPCDialOption(
-			grpc.WithTransportCredentials(&wrapTransportCredentials{
-				TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
-			}),
-		),
-		option.WithTokenSource(tokenSource),
-	)
+	sc, err := createClient(ctx, env.SpannerDatabase)
 	if err != nil {
 		panic(err)
 	}
