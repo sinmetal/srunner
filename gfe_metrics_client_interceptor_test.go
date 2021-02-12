@@ -14,6 +14,7 @@ import (
 	"google.golang.org/api/option"
 	spannerpb "google.golang.org/genproto/googleapis/spanner/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -60,6 +61,34 @@ func TestGFEMetricsStreamClientInterceptor(t *testing.T) {
 	sc, err := spanner.NewClientWithConfig(ctx, gcpugPublicSpannerDB, config,
 		option.WithGRPCDialOption(grpc.WithStreamInterceptor(GFEMetricsStreamClientInterceptor())),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sc.Close()
+
+	requestToSpanner(ctx, t, sc)
+}
+
+func TestGFEMetricsClientInterceptor(t *testing.T) {
+	t.SkipNow()
+
+	ctx := context.Background()
+
+	// Need to specify scope for the specific service.
+	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, spanner.Scope)
+	if err != nil {
+		panic(err)
+	}
+
+	sc, err := createClient(ctx, gcpugPublicSpannerDB,
+		option.WithGRPCDialOption(
+			grpc.WithTransportCredentials(&wrapTransportCredentials{
+				TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
+			}),
+		),
+		option.WithGRPCDialOption(grpc.WithUnaryInterceptor(GFEMetricsUnaryClientInterceptor())),
+		option.WithGRPCDialOption(grpc.WithStreamInterceptor(GFEMetricsStreamClientInterceptor())),
+		option.WithTokenSource(tokenSource))
 	if err != nil {
 		t.Fatal(err)
 	}
