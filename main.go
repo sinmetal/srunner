@@ -83,6 +83,7 @@ func main() {
 			}),
 		),
 		option.WithGRPCDialOption(grpc.WithUnaryInterceptor(GFEMetricsUnaryClientInterceptor())),
+		option.WithGRPCDialOption(grpc.WithStreamInterceptor(GFEMetricsStreamClientInterceptor())),
 		option.WithTokenSource(tokenSource),
 	)
 	if err != nil {
