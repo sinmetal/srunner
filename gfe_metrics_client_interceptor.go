@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
+	"go.opencensus.io/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -17,7 +20,12 @@ func GFEMetricsUnaryClientInterceptor() grpc.UnaryClientInterceptor {
 		addOpts := append(opts, grpc.Header(&md))
 
 		defer func() {
-			fmt.Printf("server-timing:%+v\n", md.Get("server-timing"))
+			v, ok := ExtractServerTimingValue(md)
+			if !ok {
+				return
+			}
+			span := trace.FromContext(ctx)
+			span.AddAttributes(trace.Int64Attribute("server-timing", v))
 		}()
 
 		return invoker(ctx, method, req, reply, cc, addOpts...)
@@ -34,9 +42,27 @@ func GFEMetricsStreamClientInterceptor() grpc.StreamClientInterceptor {
 
 		defer func() {
 			// TODO metadata 取れるけど、中身空っぽだなー
-			fmt.Printf("server-timing:%+v\n", md.Get("server-timing"))
+			v, ok := ExtractServerTimingValue(md)
+			if !ok {
+				return
+			}
+			span := trace.FromContext(ctx)
+			span.AddAttributes(trace.Int64Attribute("server-timing", v))
 		}()
 
 		return streamer(ctx, desc, cc, method, addOpts...)
 	}
+}
+
+func ExtractServerTimingValue(md metadata.MD) (int64, bool) {
+	metaValues := md.Get("server-timing")
+	for _, mv := range metaValues {
+		v := strings.ReplaceAll(mv, "gfet4t7; dur=", "")
+		i, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return i, true
+	}
+	return 0, false
 }
