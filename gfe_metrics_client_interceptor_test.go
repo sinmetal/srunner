@@ -140,3 +140,30 @@ func TestSpannerAPIV1(t *testing.T) {
 	srvTiming := md.Get("server-timing")
 	t.Log(srvTiming)
 }
+
+func TestExtractServerTimingValue(t *testing.T) {
+	cases := []struct {
+		name string
+		text string
+		want int64
+		ok   bool
+	}{
+		{"null", "", 0, false},
+		{"exist", "gfet4t7; dur=2516", 2516, true},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			var md metadata.MD = make(map[string][]string)
+			md.Set("server-timing", tt.text)
+			got, ok := ExtractServerTimingValue(md)
+			if ok != tt.ok {
+				t.Errorf("want ok is %t but got %t,", tt.ok, ok)
+			}
+			if got != tt.want {
+				t.Errorf("want %d but got %d", tt.want, got)
+			}
+		})
+	}
+}
