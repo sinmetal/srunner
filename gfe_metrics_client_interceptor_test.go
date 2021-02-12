@@ -25,6 +25,8 @@ type Measure struct {
 var gcpugPublicSpannerDB = fmt.Sprintf("projects/%s/instances/%s/databases/%s", "gcpug-public-spanner", "merpay-sponsored-instance", "sinmetal")
 
 func TestGFEMetricsUnaryClientInterceptor(t *testing.T) {
+	t.SkipNow()
+
 	ctx := context.Background()
 
 	config := spanner.ClientConfig{
@@ -45,6 +47,8 @@ func TestGFEMetricsUnaryClientInterceptor(t *testing.T) {
 }
 
 func TestGFEMetricsStreamClientInterceptor(t *testing.T) {
+	t.SkipNow()
+
 	ctx := context.Background()
 
 	config := spanner.ClientConfig{
