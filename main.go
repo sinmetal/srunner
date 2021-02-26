@@ -140,6 +140,7 @@ func main() {
 // ready is 動作準備完了するまでブロックする
 // Workload Identityは最初数秒間SAが来ない的な話があったと思ったので、それを待つためのもの
 func ready(ctx context.Context, sc *spanner.Client) {
+	fmt.Println("Ready Start")
 	sleepSec := 1
 	for {
 		iter := sc.Single().Query(ctx, spanner.NewStatement("SELECT 1"))
@@ -147,6 +148,7 @@ func ready(ctx context.Context, sc *spanner.Client) {
 		for {
 			_, err := iter.Next()
 			if err == iterator.Done {
+				fmt.Println("Ready Finish")
 				return
 			} else if err != nil {
 				fmt.Printf("try ready... next %d sec. %s", sleepSec, err)
