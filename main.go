@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/google/uuid"
@@ -143,7 +144,7 @@ func ready(ctx context.Context, sc *spanner.Client) {
 	fmt.Println("Ready Start")
 	sleepSec := 1
 	for {
-		saEmail, err := metadatabox.ServiceAccountEmail()
+		saEmail, err := metadata.InstanceAttributeValue("service-accounts/default/email")
 		if err != nil {
 			log.Fatal(ctx, err.Error())
 		}
