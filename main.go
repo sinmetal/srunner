@@ -144,7 +144,7 @@ func ready(ctx context.Context, sc *spanner.Client) {
 	fmt.Println("Ready Start")
 	sleepSec := 1
 	for {
-		saEmail, err := metadata.InstanceAttributeValue("service-accounts/default/email")
+		saEmail, err := metadata.Email("")
 		if err != nil {
 			log.Fatal(ctx, err.Error())
 		}
