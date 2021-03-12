@@ -29,6 +29,12 @@ type EnvConfig struct {
 func main() {
 	ctx := context.Background()
 
+	saEmail, err := metadatabox.ServiceAccountEmail()
+	if err != nil {
+		log.Fatal(ctx, err.Error())
+	}
+	log.Info(ctx, fmt.Sprintf("I am %s\n", saEmail))
+
 	var env EnvConfig
 	if err := envconfig.Process("srunner", &env); err != nil {
 		log.Fatal(ctx, err.Error())
