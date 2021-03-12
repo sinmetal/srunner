@@ -29,12 +29,6 @@ type EnvConfig struct {
 func main() {
 	ctx := context.Background()
 
-	saEmail, err := metadatabox.ServiceAccountEmail()
-	if err != nil {
-		log.Fatal(ctx, err.Error())
-	}
-	log.Info(ctx, fmt.Sprintf("I am %s\n", saEmail))
-
 	var env EnvConfig
 	if err := envconfig.Process("srunner", &env); err != nil {
 		log.Fatal(ctx, err.Error())
@@ -149,6 +143,12 @@ func ready(ctx context.Context, sc *spanner.Client) {
 	fmt.Println("Ready Start")
 	sleepSec := 1
 	for {
+		saEmail, err := metadatabox.ServiceAccountEmail()
+		if err != nil {
+			log.Fatal(ctx, err.Error())
+		}
+		log.Info(ctx, fmt.Sprintf("I am %s\n", saEmail))
+
 		iter := sc.Single().Query(ctx, spanner.NewStatement("SELECT 1"))
 		defer iter.Stop()
 		for {
@@ -157,7 +157,7 @@ func ready(ctx context.Context, sc *spanner.Client) {
 				fmt.Println("Ready Finish")
 				return
 			} else if err != nil {
-				fmt.Printf("try ready... next %d sec. %s", sleepSec, err)
+				fmt.Printf("try ready... next %d sec. %s\n", sleepSec, err)
 				time.Sleep(time.Duration(sleepSec) * time.Second)
 				break
 			}
