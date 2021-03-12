@@ -23,5 +23,5 @@ steps:
     - srunner-dep=gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA
   env:
     - 'CLOUDSDK_COMPUTE_ZONE=asia-northeast1-b'
-    - 'CLOUDSDK_CONTAINER_CLUSTER=sinmetal-tokyo'
+    - 'CLOUDSDK_CONTAINER_CLUSTER=sinmetal-tokyo-a'
 images: ['gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA']
