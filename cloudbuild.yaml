@@ -21,6 +21,7 @@ steps:
     - image
     - deployment/srunner-dep
     - srunner-dep=gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA
+    - namespace=metalapps
   env:
     - 'CLOUDSDK_COMPUTE_ZONE=asia-northeast1-b'
     - 'CLOUDSDK_COMPUTE_REGION=asia-northeast1'
