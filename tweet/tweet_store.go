@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"github.com/sinmetal/srunner/operation"
+	"go.opencensus.io/trace"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 )
@@ -20,7 +21,7 @@ type TweetStore interface {
 	Insert(ctx context.Context, tweet *Tweet) error
 	InsertBench(ctx context.Context, id string) error
 	InsertWithOperation(ctx context.Context, id string) error
-	Update(ctx context.Context, id string) error
+	Update(ctx context.Context, id string) (*spanner.CommitResponse, error)
 	Delete(ctx context.Context, id string) error
 	Get(ctx context.Context, key spanner.Key) (*Tweet, error)
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
@@ -383,11 +384,11 @@ LIMIT @Limit
 	return ts, nil
 }
 
-func (s *defaultTweetStore) Update(ctx context.Context, id string) error {
+func (s *defaultTweetStore) Update(ctx context.Context, id string) (*spanner.CommitResponse, error) {
 	ctx, span := startSpan(ctx, "update")
 	defer span.End()
 
-	_, err := s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+	resp, err := s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		tr, err := txn.ReadRow(ctx, s.TableName(), spanner.Key{id}, []string{"Count"})
 		if err != nil {
 			return fmt.Errorf("failed spanner.ReadRow : %w", err)
@@ -407,11 +408,13 @@ func (s *defaultTweetStore) Update(ctx context.Context, id string) error {
 			return fmt.Errorf("failed spanner.Tx.BufferWrite : %w", err)
 		}
 		return nil
-	})
+	}, spanner.TransactionOptions{CommitOptions: spanner.CommitOptions{ReturnCommitStats: true}})
 	if err != nil {
-		return fmt.Errorf("failed TweetStore.Update : %w", err)
+		return nil, fmt.Errorf("failed TweetStore.Update : %w", err)
 	}
-	return nil
+	span.AddAttributes(trace.Int64Attribute("mutation-count", resp.CommitStats.GetMutationCount()))
+
+	return &resp, nil
 }
 
 // Delete is 指定した ID の Row を削除する
