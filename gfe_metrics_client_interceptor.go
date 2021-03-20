@@ -35,6 +35,7 @@ func (w *wrappedStream) RecvMsg(m interface{}) error {
 	md, err := w.Header()
 	if err != nil {
 		log.Printf("failed grpc.ClientStream.Header.Get")
+		return w.ClientStream.RecvMsg(m)
 	}
 	v, ok := ExtractServerTimingValue(md)
 	if ok {
