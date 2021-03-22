@@ -316,7 +316,8 @@ func goUpdateTweet(ts tweet.TweetStore, goroutine int, endCh chan<- error) {
 
 						retCh := make(chan error, 1)
 						go func() {
-							retCh <- ts.Update(ctx, id)
+							_, err := ts.Update(ctx, id)
+							retCh <- err
 						}()
 						select {
 						case <-ctx.Done():
@@ -387,7 +388,8 @@ func goUpdateTweetWithFCFS(ts tweet.TweetStore, goroutine int, endCh chan<- erro
 						}
 
 						err := goFCFS(ctx, "UPDATE", id, i, func(ctx context.Context, id string, i int) (interface{}, error) {
-							return "", ts.Update(ctx, id)
+							_, err := ts.Update(ctx, id)
+							return "", err
 						})
 						if failure.Is(err, NotFound) {
 							fmt.Printf("TWEET_UPDATE TARGET %s IS NOT_FOUND\n", id)
