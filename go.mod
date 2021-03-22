@@ -3,7 +3,7 @@ module github.com/sinmetal/srunner
 go 1.12
 
 require (
-	cloud.google.com/go v0.76.0 // indirect
+	cloud.google.com/go v0.76.0
 	cloud.google.com/go/spanner v1.14.1
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.5
 	github.com/aws/aws-sdk-go v1.37.7 // indirect
