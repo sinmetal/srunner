@@ -26,4 +26,15 @@ steps:
     - 'CLOUDSDK_COMPUTE_ZONE=asia-northeast1-b'
     - 'CLOUDSDK_COMPUTE_REGION=asia-northeast1'
     - 'CLOUDSDK_CONTAINER_CLUSTER=sinmetal-tokyo-a'
+- name: 'gcr.io/cloud-builders/kubectl'
+  args:
+    - set
+    - image
+    - deployment/srunner-dep
+    - srunner-dep=gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA
+    - --namespace=metalapps
+  env:
+    - 'CLOUDSDK_COMPUTE_ZONE=asia-northeast1-b'
+    - 'CLOUDSDK_COMPUTE_REGION=asia-northeast1'
+    - 'CLOUDSDK_CONTAINER_CLUSTER=sinmetal-tokyo-b'
 images: ['gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA']
