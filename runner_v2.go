@@ -216,7 +216,8 @@ func (run *RunnerV2) updateTweet(ctx context.Context, id string) {
 
 	retCh := make(chan error, 1)
 	go func() {
-		retCh <- run.ts.Update(ctx, id)
+		_, err := run.ts.Update(ctx, id)
+		retCh <- err
 	}()
 	select {
 	case <-ctx.Done():
