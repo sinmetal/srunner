@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/google/uuid"
@@ -12,9 +14,9 @@ import (
 	"github.com/sinmetal/srunner/tweet"
 	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 	"go.opencensus.io/trace"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 const Service = "srunner"
@@ -75,17 +77,18 @@ func main() {
 	if err := spanner.EnableStatViews(); err != nil {
 		panic(err)
 	}
+
 	sc, err := createClient(ctx, env.SpannerDatabase,
-		option.WithGRPCDialOption(
-			grpc.WithTransportCredentials(&wrapTransportCredentials{
-				TransportCredentials: credentials.NewClientTLSFromCert(nil, ""),
-			}),
-		),
+		option.WithGRPCDialOption(grpc.WithUnaryInterceptor(GFEMetricsUnaryClientInterceptor())),
+		option.WithGRPCDialOption(grpc.WithStreamInterceptor(GFEMetricsStreamClientInterceptor())),
 		option.WithTokenSource(tokenSource),
 	)
 	if err != nil {
 		panic(err)
 	}
+
+	ready(ctx, sc)
+
 	ts := tweet.NewTweetStore(sc)
 
 	// ias := item.NewAllStore(ctx, sc)
@@ -133,4 +136,33 @@ func main() {
 	err = <-endCh
 	fmt.Printf("BOMB %+v", err)
 	sc.Close()
+}
+
+// ready is 動作準備完了するまでブロックする
+// Workload Identityは最初数秒間SAが来ない的な話があったと思ったので、それを待つためのもの
+func ready(ctx context.Context, sc *spanner.Client) {
+	fmt.Println("Ready Start")
+	sleepSec := 1
+	for {
+		saEmail, err := metadata.Email("")
+		if err != nil {
+			log.Fatal(ctx, err.Error())
+		}
+		log.Info(ctx, fmt.Sprintf("I am %s\n", saEmail))
+
+		iter := sc.Single().Query(ctx, spanner.NewStatement("SELECT 1"))
+		defer iter.Stop()
+		for {
+			_, err := iter.Next()
+			if err == iterator.Done {
+				fmt.Println("Ready Finish")
+				return
+			} else if err != nil {
+				fmt.Printf("try ready... next %d sec. %s\n", sleepSec, err)
+				time.Sleep(time.Duration(sleepSec) * time.Second)
+				break
+			}
+		}
+		sleepSec *= 2
+	}
 }

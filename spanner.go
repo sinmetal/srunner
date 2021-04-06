@@ -5,7 +5,6 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"google.golang.org/api/option"
-	"google.golang.org/grpc/credentials"
 )
 
 func createClient(ctx context.Context, db string, o ...option.ClientOption) (*spanner.Client, error) {
@@ -21,8 +20,4 @@ func createClient(ctx context.Context, db string, o ...option.ClientOption) (*sp
 	}
 
 	return dataClient, nil
-}
-
-type wrapTransportCredentials struct {
-	credentials.TransportCredentials
 }
