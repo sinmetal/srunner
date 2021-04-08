@@ -15,6 +15,7 @@ spec:
       labels:
         app: srunner-dep
     spec:
+      serviceAccountName: metalapps-sa
       containers:
         - name: srunner-dep
           image: asia-northeast1-docker.pkg.dev/$PROJECT_ID/srunner/$BRANCH_NAME:$COMMIT_SHA
