@@ -22,6 +22,7 @@ type TweetStore interface {
 	InsertBench(ctx context.Context, id string) error
 	InsertWithOperation(ctx context.Context, id string) error
 	Update(ctx context.Context, id string) (*spanner.CommitResponse, error)
+	UpdateDML(ctx context.Context, id string) (time.Time, error)
 	Delete(ctx context.Context, id string) error
 	Get(ctx context.Context, key spanner.Key) (*Tweet, error)
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
@@ -415,6 +416,26 @@ func (s *defaultTweetStore) Update(ctx context.Context, id string) (*spanner.Com
 	span.AddAttributes(trace.Int64Attribute("mutation-count", resp.CommitStats.GetMutationCount()))
 
 	return &resp, nil
+}
+
+func (s *defaultTweetStore) UpdateDML(ctx context.Context, id string) (time.Time, error) {
+	ctx, span := startSpan(ctx, "updateDML")
+	defer span.End()
+
+	return s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		stmt := spanner.Statement{
+			SQL: `UPDATE Tweet SET Count += 1, UpdatedAt = @UpdatedAt, CommitedAt = PENDING_COMMIT_TIMESTAMP() WHERE Id = @Id`,
+		}
+		stmt.Params = map[string]interface{}{
+			"@UpdatedAt": time.Now(),
+			"@Id":        id,
+		}
+		_, err := txn.Update(ctx, stmt)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // Delete is 指定した ID の Row を削除する
