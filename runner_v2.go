@@ -161,7 +161,7 @@ func (run *RunnerV2) GoUpdateTweet(concurrent int) {
 			case <-t.C:
 				ctx := context.Background()
 
-				tlist, err := run.ts.QueryOrderByCreatedAtDesc(ctx, last, limit)
+				tlist, err := run.ts.QueryOrderByCreatedAtDesc(ctx, 0, 3, last, limit)
 				if err != nil {
 					run.endCh <- fmt.Errorf("failed GoUpdateTweet : QueryResultStruct : %w", err)
 				}
@@ -243,7 +243,7 @@ func (run *RunnerV2) GoUpdateDMLTweet(concurrent int) {
 			case <-t.C:
 				ctx := context.Background()
 
-				tlist, err := run.ts.QueryOrderByCreatedAtDesc(ctx, last, limit)
+				tlist, err := run.ts.QueryOrderByCreatedAtDesc(ctx, 5, 8, last, limit)
 				if err != nil {
 					run.endCh <- fmt.Errorf("failed GoUpdateTweet : QueryResultStruct : %w", err)
 				}
