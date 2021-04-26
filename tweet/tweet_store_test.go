@@ -124,6 +124,8 @@ func TestDefaultTweetStore_QueryLatestByAuthor(t *testing.T) {
 }
 
 func TestDefaultTweetStore_QueryOrderByCreatedAtDesc(t *testing.T) {
+	t.SkipNow()
+
 	ctx := context.Background()
 
 	NewTestInstance(t)
