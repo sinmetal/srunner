@@ -29,7 +29,7 @@ type TweetStore interface {
 	QueryHeavy(ctx context.Context) ([]*Tweet, error)
 	QueryAll(ctx context.Context) (int, error)
 	QueryResultStruct(ctx context.Context, orderByAsc bool, limit int, tb *spanner.TimestampBound) ([]*TweetIDAndAuthor, error)
-	QueryOrderByCreatedAtDesc(ctx context.Context, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error)
+	QueryOrderByCreatedAtDesc(ctx context.Context, startShard int, endShard int, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error)
 	QueryRandom(ctx context.Context) error
 	QueryLatestByAuthor(ctx context.Context, author string, tb *spanner.TimestampBound) ([]*Tweet, error)
 }
@@ -339,13 +339,13 @@ type PageOptionForQueryOrderByCreatedAtDesc struct {
 }
 
 // QueryResultStruct is StructをResultで返すQueryのサンプル
-func (s *defaultTweetStore) QueryOrderByCreatedAtDesc(ctx context.Context, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error) {
+func (s *defaultTweetStore) QueryOrderByCreatedAtDesc(ctx context.Context, startShard int, endShard int, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error) {
 	ctx, span := startSpan(ctx, "queryOrderByCreatedAtDesc")
 	defer span.End()
 
 	sql := `
 SELECT c.Id, c.Author, c.Content, c.Count, c.Favos, c.Sort, c.ShardCreatedAt, c.CreatedAt, c.UpdatedAt, c.CommitedAt, c.SchemaVersion 
-FROM UNNEST(GENERATE_ARRAY(0, 9)) AS OneShardCreatedAt,
+FROM UNNEST(GENERATE_ARRAY(@StartShard, @EndShard)) AS OneShardCreatedAt,
      UNNEST(ARRAY(
       SELECT AS STRUCT *
       FROM Tweet@{FORCE_INDEX=TweetShardCreatedAtAscCreatedAtDesc} 
@@ -357,6 +357,8 @@ LIMIT @Limit
 `
 
 	st := spanner.NewStatement(sql)
+	st.Params["StartShard"] = startShard
+	st.Params["EndShard"] = endShard
 	st.Params["Id"] = pageOption.ID
 	st.Params["Limit"] = limit
 	iter := s.sc.Single().Query(ctx, st)
