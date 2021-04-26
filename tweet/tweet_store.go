@@ -350,8 +350,6 @@ FROM UNNEST(GENERATE_ARRAY(0, 9)) AS OneShardCreatedAt,
       SELECT AS STRUCT *
       FROM Tweet@{FORCE_INDEX=TweetShardCreatedAtAscCreatedAtDesc} 
       WHERE ShardCreatedAt = OneShardCreatedAt
-        AND (CreatedAt < @CreatedAt) 
-          OR (CreatedAt = @CreatedAt AND Id > @Id)
       ORDER BY CreatedAt DESC LIMIT @Limit
     )) AS c
 ORDER BY c.CreatedAt DESC, Id
@@ -359,7 +357,6 @@ LIMIT @Limit
 `
 
 	st := spanner.NewStatement(sql)
-	st.Params["CreatedAt"] = pageOption.CreatedAt
 	st.Params["Id"] = pageOption.ID
 	st.Params["Limit"] = limit
 	iter := s.sc.Single().Query(ctx, st)
