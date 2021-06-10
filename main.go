@@ -8,6 +8,8 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
+	apsts "github.com/apstndb/tokensource"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sinmetal/srunner/log"
@@ -15,6 +17,7 @@ import (
 	"github.com/sinmetal/srunner/tweet"
 	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 	"go.opencensus.io/trace"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -70,7 +73,19 @@ func main() {
 	}
 
 	// Need to specify scope for the specific service.
-	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, spanner.Scope)
+	var generatorFunc func(context.Context) (oauth2.TokenSource, error)
+	generatorFunc = func(ctx context.Context) (oauth2.TokenSource, error) {
+		return apsts.SmartAccessTokenSource(ctx, spanner.Scope)
+	}
+	tokenSource, err := apsts.AsyncRefreshingTokenSource(ctx, apsts.AsyncRefreshingConfig{
+		RandomizationFactorForRefreshInterval: 0.5,
+		RefreshInterval:                       30 * time.Second,
+		Backoff: func() backoff.BackOff {
+			b := backoff.NewExponentialBackOff()
+			b.MaxElapsedTime = 1 * time.Minute
+			return b
+		}(),
+	}, generatorFunc)
 	if err != nil {
 		panic(err)
 	}
