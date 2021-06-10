@@ -170,6 +170,11 @@ func main() {
 // Workload Identityは最初数秒間SAが来ない的な話があったと思ったので、それを待つためのもの
 func ready(ctx context.Context, sc *spanner.Client) {
 	fmt.Println("Ready Start")
+	start := time.Now()
+	defer func() {
+		fmt.Printf("Ready Finish. time:%s\n", start.Sub(time.Now()))
+	}()
+
 	sleepSec := 1
 	for {
 		saEmail, err := metadata.Email("")
@@ -183,7 +188,6 @@ func ready(ctx context.Context, sc *spanner.Client) {
 		for {
 			_, err := iter.Next()
 			if err == iterator.Done {
-				fmt.Println("Ready Finish")
 				return
 			} else if err != nil {
 				fmt.Printf("try ready... next %d sec. %s\n", sleepSec, err)
