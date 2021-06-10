@@ -22,13 +22,14 @@ type TweetStore interface {
 	InsertBench(ctx context.Context, id string) error
 	InsertWithOperation(ctx context.Context, id string) error
 	Update(ctx context.Context, id string) (*spanner.CommitResponse, error)
+	UpdateDML(ctx context.Context, id string) (time.Time, error)
 	Delete(ctx context.Context, id string) error
 	Get(ctx context.Context, key spanner.Key) (*Tweet, error)
 	Query(ctx context.Context, limit int) ([]*Tweet, error)
 	QueryHeavy(ctx context.Context) ([]*Tweet, error)
 	QueryAll(ctx context.Context) (int, error)
 	QueryResultStruct(ctx context.Context, orderByAsc bool, limit int, tb *spanner.TimestampBound) ([]*TweetIDAndAuthor, error)
-	QueryOrderByCreatedAtDesc(ctx context.Context, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error)
+	QueryOrderByCreatedAtDesc(ctx context.Context, startShard int, endShard int, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error)
 	QueryRandom(ctx context.Context) error
 	QueryLatestByAuthor(ctx context.Context, author string, tb *spanner.TimestampBound) ([]*Tweet, error)
 }
@@ -338,19 +339,17 @@ type PageOptionForQueryOrderByCreatedAtDesc struct {
 }
 
 // QueryResultStruct is StructをResultで返すQueryのサンプル
-func (s *defaultTweetStore) QueryOrderByCreatedAtDesc(ctx context.Context, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error) {
+func (s *defaultTweetStore) QueryOrderByCreatedAtDesc(ctx context.Context, startShard int, endShard int, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error) {
 	ctx, span := startSpan(ctx, "queryOrderByCreatedAtDesc")
 	defer span.End()
 
 	sql := `
 SELECT c.Id, c.Author, c.Content, c.Count, c.Favos, c.Sort, c.ShardCreatedAt, c.CreatedAt, c.UpdatedAt, c.CommitedAt, c.SchemaVersion 
-FROM UNNEST(GENERATE_ARRAY(0, 9)) AS OneShardCreatedAt,
+FROM UNNEST(GENERATE_ARRAY(@StartShard, @EndShard)) AS OneShardCreatedAt,
      UNNEST(ARRAY(
       SELECT AS STRUCT *
       FROM Tweet@{FORCE_INDEX=TweetShardCreatedAtAscCreatedAtDesc} 
       WHERE ShardCreatedAt = OneShardCreatedAt
-        AND (CreatedAt < @CreatedAt) 
-          OR (CreatedAt = @CreatedAt AND Id > @Id)
       ORDER BY CreatedAt DESC LIMIT @Limit
     )) AS c
 ORDER BY c.CreatedAt DESC, Id
@@ -358,7 +357,8 @@ LIMIT @Limit
 `
 
 	st := spanner.NewStatement(sql)
-	st.Params["CreatedAt"] = pageOption.CreatedAt
+	st.Params["StartShard"] = startShard
+	st.Params["EndShard"] = endShard
 	st.Params["Id"] = pageOption.ID
 	st.Params["Limit"] = limit
 	iter := s.sc.Single().Query(ctx, st)
@@ -415,6 +415,26 @@ func (s *defaultTweetStore) Update(ctx context.Context, id string) (*spanner.Com
 	span.AddAttributes(trace.Int64Attribute("mutation-count", resp.CommitStats.GetMutationCount()))
 
 	return &resp, nil
+}
+
+func (s *defaultTweetStore) UpdateDML(ctx context.Context, id string) (time.Time, error) {
+	ctx, span := startSpan(ctx, "updateDML")
+	defer span.End()
+
+	return s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		stmt := spanner.Statement{
+			SQL: `UPDATE Tweet SET Count += 1, UpdatedAt = @UpdatedAt, CommitedAt = PENDING_COMMIT_TIMESTAMP() WHERE Id = @Id`,
+		}
+		stmt.Params = map[string]interface{}{
+			"@UpdatedAt": time.Now(),
+			"@Id":        id,
+		}
+		_, err := txn.Update(ctx, stmt)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // Delete is 指定した ID の Row を削除する
