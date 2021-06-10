@@ -161,7 +161,7 @@ func (run *RunnerV2) GoUpdateTweet(concurrent int) {
 			case <-t.C:
 				ctx := context.Background()
 
-				tlist, err := run.ts.QueryOrderByCreatedAtDesc(ctx, last, limit)
+				tlist, err := run.ts.QueryOrderByCreatedAtDesc(ctx, 0, 3, last, limit)
 				if err != nil {
 					run.endCh <- fmt.Errorf("failed GoUpdateTweet : QueryResultStruct : %w", err)
 				}
@@ -217,6 +217,88 @@ func (run *RunnerV2) updateTweet(ctx context.Context, id string) {
 	retCh := make(chan error, 1)
 	go func() {
 		_, err := run.ts.Update(ctx, id)
+		retCh <- err
+	}()
+	select {
+	case <-ctx.Done():
+		run.outputMetrics(ctx, metricsID, nil)
+	case err := <-retCh:
+		run.outputMetrics(ctx, metricsID, err)
+	}
+}
+
+func (run *RunnerV2) GoUpdateDMLTweet(concurrent int) {
+	const limit = 1000
+	idCh := make(chan string, 10000)
+	go func() {
+		t := time.NewTicker(1000 * time.Millisecond)
+		defer t.Stop()
+
+		last := &tweet.PageOptionForQueryOrderByCreatedAtDesc{
+			ID:        "",
+			CreatedAt: time.Now(),
+		}
+		for {
+			select {
+			case <-t.C:
+				ctx := context.Background()
+
+				tlist, err := run.ts.QueryOrderByCreatedAtDesc(ctx, 5, 8, last, limit)
+				if err != nil {
+					run.endCh <- fmt.Errorf("failed GoUpdateTweet : QueryResultStruct : %w", err)
+				}
+				for _, t := range tlist {
+					idCh <- t.ID
+				}
+
+				if len(tlist) < limit {
+					// 末尾 (最も古いデータまでいったら、先頭付近に戻る)
+					last = &tweet.PageOptionForQueryOrderByCreatedAtDesc{
+						ID:        "",
+						CreatedAt: time.Now(),
+					}
+					continue
+				}
+				last = &tweet.PageOptionForQueryOrderByCreatedAtDesc{
+					ID:        tlist[len(tlist)-1].ID,
+					CreatedAt: tlist[len(tlist)-1].CreatedAt,
+				}
+			}
+		}
+	}()
+
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			t := time.NewTicker(200 * time.Millisecond)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					ctx := context.Background()
+
+					id := <-idCh
+					run.updateTweetDML(ctx, id)
+				}
+			}
+		}()
+	}
+}
+
+func (run *RunnerV2) updateTweetDML(ctx context.Context, id string) {
+	ctx, span := startSpan(ctx, "goV2/updateTweetDML")
+	defer span.End()
+
+	const metricsID = "UPDATE DML TWEET"
+
+	var cancel context.CancelFunc
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeoutDuration)
+		defer cancel()
+	}
+
+	retCh := make(chan error, 1)
+	go func() {
+		_, err := run.ts.UpdateDML(ctx, id)
 		retCh <- err
 	}()
 	select {
