@@ -536,13 +536,13 @@ func (run *RunnerV2) updateScore(ctx context.Context) {
 		var value int64
 		turningPoint = rand.Intn(100)
 		switch {
+		case turningPoint > 98:
+			{
+				value = rand.Int63n(9000000000)
+			}
 		case turningPoint > 95:
 			{
-				value = rand.Int63()
-			}
-		case turningPoint > 90:
-			{
-				value = rand.Int63n(5000000000)
+				value = rand.Int63n(2000000000)
 			}
 		case turningPoint > 85:
 			{
