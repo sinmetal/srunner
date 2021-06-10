@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sinmetal/srunner/log"
+	"github.com/sinmetal/srunner/score"
 	"github.com/sinmetal/srunner/tweet"
 	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 	"go.opencensus.io/trace"
@@ -90,14 +91,24 @@ func main() {
 	ready(ctx, sc)
 
 	ts := tweet.NewTweetStore(sc)
+	scoreUserStore, err := score.NewScoreUserStore(ctx, sc)
+	if err != nil {
+		panic(err)
+	}
+	scoreStore, err := score.NewScoreStore(ctx, sc)
+	if err != nil {
+		panic(err)
+	}
 
 	// ias := item.NewAllStore(ctx, sc)
 
 	endCh := make(chan error, 10)
 
 	runnerV2 := &RunnerV2{
-		ts:    ts,
-		endCh: endCh,
+		ts:             ts,
+		scoreStore:     scoreStore,
+		scoreUserStore: scoreUserStore,
+		endCh:          endCh,
 	}
 
 	// 秒間 50 Requestにするための concurrent count
