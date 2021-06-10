@@ -105,13 +105,13 @@ func main() {
 	const concurrentReq50PerSec = 10
 	const concurrentReq5PerSec = 1
 
-	runnerV2.GoInsertTweet(concurrentReq5PerSec)
-	runnerV2.GoInsertTweetWithOperation(concurrentReq5PerSec)
-	runnerV2.GoUpdateTweet(concurrentReq5PerSec)
-	runnerV2.GoUpdateDMLTweet(concurrentReq50PerSec)
-	runnerV2.GoDeleteTweet(concurrentReq50PerSec)
-	runnerV2.GoGetTweet(concurrentReq5PerSec)
-	runnerV2.GoQueryTweetLatestByAuthor(1) // 秒間 5回ほど, Author の種類が少ないので、同時実行無しで控えめ
+	//runnerV2.GoInsertTweet(concurrentReq5PerSec)
+	//runnerV2.GoInsertTweetWithOperation(concurrentReq5PerSec)
+	//runnerV2.GoUpdateTweet(concurrentReq5PerSec)
+	//runnerV2.GoUpdateDMLTweet(concurrentReq50PerSec)
+	//runnerV2.GoDeleteTweet(concurrentReq50PerSec)
+	//runnerV2.GoGetTweet(concurrentReq5PerSec)
+	//runnerV2.GoQueryTweetLatestByAuthor(1) // 秒間 5回ほど, Author の種類が少ないので、同時実行無しで控えめ
 
 	runnerV2.GoUpdateScore(10000) // すごい頑張ってみる
 	//goInsertTweet(ts, env.Goroutine, endCh)
