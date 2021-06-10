@@ -553,7 +553,7 @@ func (run *RunnerV2) updateScore(ctx context.Context) {
 		}
 		err := run.scoreStore.Upsert(ctx, &score.Score{
 			ID:       id,
-			CircleID: fmt.Sprintf("circle%08d", circleID),
+			CircleID: run.scoreStore.CircleID(circleID),
 			Score:    value,
 		})
 		retCh <- err

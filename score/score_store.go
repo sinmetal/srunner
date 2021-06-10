@@ -2,6 +2,7 @@ package score
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -26,6 +27,10 @@ type Score struct {
 	Score      int64
 	MaxScore   int64 // 過去最高スコア
 	CommitedAt time.Time
+}
+
+func (s *ScoreStore) CircleID(id int64) string {
+	return fmt.Sprintf("circle%08d", id)
 }
 
 // InsertBatch is 最初に一気にデータを作るためのもの
@@ -53,11 +58,19 @@ func (s *ScoreStore) Upsert(ctx context.Context, e *Score) error {
 	defer span.End()
 
 	_, err := s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
-		var maxScore int64
+		var m *spanner.Mutation
+		circleID := e.CircleID
 		row, err := tx.ReadRow(ctx, "Score", spanner.Key{e.ID}, []string{"Id", "MaxScore"})
 		if err != nil {
 			if spanner.ErrCode(err) == codes.NotFound {
 				// Rowがない場合はMaxScoreはZeroと考える
+				m = spanner.InsertMap("Score", map[string]interface{}{
+					"Id":         e.ID,
+					"CircleId":   circleID,
+					"Score":      e.Score,
+					"MaxScore":   e.Score,
+					"CommitedAt": spanner.CommitTimestamp,
+				})
 			} else {
 				return err
 			}
@@ -66,24 +79,38 @@ func (s *ScoreStore) Upsert(ctx context.Context, e *Score) error {
 			if err := row.ToStruct(ce); err != nil {
 				return err
 			}
-			maxScore = ce.MaxScore
+			maxScore := ce.MaxScore
+			if e.Score > maxScore {
+				maxScore = e.Score
+			}
+			m = spanner.UpdateMap("Score", map[string]interface{}{
+				"Id":         e.ID,
+				"Score":      e.Score,
+				"MaxScore":   maxScore,
+				"CommitedAt": spanner.CommitTimestamp,
+			})
 		}
 
-		if e.Score > maxScore {
-			maxScore = e.Score
-		}
-
-		m := spanner.InsertOrUpdateMap("Score", map[string]interface{}{
-			"Id":         e.ID,
-			"CircleId":   e.CircleID,
-			"Score":      e.Score,
-			"MaxScore":   maxScore,
-			"CommitedAt": spanner.CommitTimestamp,
-		})
 		return tx.BufferWrite([]*spanner.Mutation{m})
 	})
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (s *ScoreStore) Get(ctx context.Context, id string) (*Score, error) {
+	ctx, span := startSpan(ctx, "ScoreStore/get")
+	defer span.End()
+
+	row, err := s.sc.Single().ReadRow(ctx, "Score", spanner.Key{id},
+		[]string{"Id", "ClassRank", "CircleId", "Score", "MaxScore", "CommitedAt"})
+	if err != nil {
+		return nil, err
+	}
+	var e Score
+	if err := row.ToStruct(&e); err != nil {
+		return nil, err
+	}
+	return &e, nil
 }
