@@ -6,8 +6,9 @@ require (
 	cloud.google.com/go v0.81.0
 	cloud.google.com/go/spanner v1.17.0
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.5
-	github.com/apstndb/tokensource v0.0.0-20210608114920-ac4f5bb05597 // indirect
+	github.com/apstndb/tokensource v0.0.0-20210608114920-ac4f5bb05597
 	github.com/aws/aws-sdk-go v1.38.25 // indirect
+	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/uuid v1.2.0
 	github.com/googleapis/gax-go/v2 v2.0.5

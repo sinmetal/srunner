@@ -169,6 +169,11 @@ func main() {
 // ready is 動作準備完了するまでブロックする
 // Workload Identityは最初数秒間SAが来ない的な話があったと思ったので、それを待つためのもの
 func ready(ctx context.Context, sc *spanner.Client) {
+	if !metadatabox.OnGCP() {
+		// localでは即Return
+		return
+	}
+
 	fmt.Println("Ready Start")
 	start := time.Now()
 	defer func() {

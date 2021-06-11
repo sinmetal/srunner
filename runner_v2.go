@@ -509,7 +509,7 @@ func (run *RunnerV2) updateScore(ctx context.Context) {
 	}
 
 	retCh := make(chan error, 1)
-	go func() {
+	go func(ctx context.Context) {
 		id := run.scoreUserStore.ID(ctx, rand.Int63n(1000000000))
 
 		// circleにある程度偏りをもたらす
@@ -555,7 +555,7 @@ func (run *RunnerV2) updateScore(ctx context.Context) {
 			Score:    value,
 		})
 		retCh <- err
-	}()
+	}(ctx)
 	select {
 	case <-ctx.Done():
 		run.outputMetrics(ctx, metricsID, nil)
