@@ -34,7 +34,7 @@ func GFEMetricsUnaryClientInterceptor() grpc.UnaryClientInterceptor {
 func (w *wrappedStream) RecvMsg(m interface{}) error {
 	md, err := w.Header()
 	if err != nil {
-		log.Printf("failed grpc.ClientStream.Header.Get")
+		log.Printf("failed grpc.ClientStream.Header.Get err=%v\n", err)
 		return w.ClientStream.RecvMsg(m)
 	}
 	v, ok := ExtractServerTimingValue(md)

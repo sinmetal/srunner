@@ -8,12 +8,16 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	"cloud.google.com/go/spanner"
 	"contrib.go.opencensus.io/exporter/stackdriver"
+	apsts "github.com/apstndb/tokensource"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sinmetal/srunner/log"
+	"github.com/sinmetal/srunner/score"
 	"github.com/sinmetal/srunner/tweet"
 	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 	"go.opencensus.io/trace"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -69,7 +73,19 @@ func main() {
 	}
 
 	// Need to specify scope for the specific service.
-	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, spanner.Scope)
+	var generatorFunc func(context.Context) (oauth2.TokenSource, error)
+	generatorFunc = func(ctx context.Context) (oauth2.TokenSource, error) {
+		return apsts.SmartAccessTokenSource(ctx, spanner.Scope)
+	}
+	tokenSource, err := apsts.AsyncRefreshingTokenSource(ctx, apsts.AsyncRefreshingConfig{
+		RandomizationFactorForRefreshInterval: 0.5,
+		RefreshInterval:                       30 * time.Second,
+		Backoff: func() backoff.BackOff {
+			b := backoff.NewExponentialBackOff()
+			b.MaxElapsedTime = 1 * time.Minute
+			return b
+		}(),
+	}, generatorFunc)
 	if err != nil {
 		panic(err)
 	}
@@ -90,14 +106,24 @@ func main() {
 	ready(ctx, sc)
 
 	ts := tweet.NewTweetStore(sc)
+	scoreUserStore, err := score.NewScoreUserStore(ctx, sc)
+	if err != nil {
+		panic(err)
+	}
+	scoreStore, err := score.NewScoreStore(ctx, sc)
+	if err != nil {
+		panic(err)
+	}
 
 	// ias := item.NewAllStore(ctx, sc)
 
 	endCh := make(chan error, 10)
 
 	runnerV2 := &RunnerV2{
-		ts:    ts,
-		endCh: endCh,
+		ts:             ts,
+		scoreStore:     scoreStore,
+		scoreUserStore: scoreUserStore,
+		endCh:          endCh,
 	}
 
 	// 秒間 50 Requestにするための concurrent count
@@ -105,14 +131,15 @@ func main() {
 	const concurrentReq50PerSec = 10
 	const concurrentReq5PerSec = 1
 
-	runnerV2.GoInsertTweet(concurrentReq5PerSec)
-	runnerV2.GoInsertTweetWithOperation(concurrentReq5PerSec)
-	runnerV2.GoUpdateTweet(concurrentReq5PerSec)
-	runnerV2.GoUpdateDMLTweet(concurrentReq50PerSec)
-	runnerV2.GoDeleteTweet(concurrentReq50PerSec)
-	runnerV2.GoGetTweet(concurrentReq5PerSec)
-	runnerV2.GoQueryTweetLatestByAuthor(1) // 秒間 5回ほど, Author の種類が少ないので、同時実行無しで控えめ
+	//runnerV2.GoInsertTweet(concurrentReq5PerSec)
+	//runnerV2.GoInsertTweetWithOperation(concurrentReq5PerSec)
+	//runnerV2.GoUpdateTweet(concurrentReq5PerSec)
+	//runnerV2.GoUpdateDMLTweet(concurrentReq50PerSec)
+	//runnerV2.GoDeleteTweet(concurrentReq50PerSec)
+	//runnerV2.GoGetTweet(concurrentReq5PerSec)
+	//runnerV2.GoQueryTweetLatestByAuthor(1) // 秒間 5回ほど, Author の種類が少ないので、同時実行無しで控えめ
 
+	runnerV2.GoUpdateScore(200) // すごい頑張ってみる
 	//goInsertTweet(ts, env.Goroutine, endCh)
 	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	// goInsertTweetWithFCFS(ts, env.Goroutine, endCh)
@@ -142,7 +169,17 @@ func main() {
 // ready is 動作準備完了するまでブロックする
 // Workload Identityは最初数秒間SAが来ない的な話があったと思ったので、それを待つためのもの
 func ready(ctx context.Context, sc *spanner.Client) {
+	if !metadatabox.OnGCP() {
+		// localでは即Return
+		return
+	}
+
 	fmt.Println("Ready Start")
+	start := time.Now()
+	defer func() {
+		fmt.Printf("Ready Finish. time:%s\n", start.Sub(time.Now()))
+	}()
+
 	sleepSec := 1
 	for {
 		saEmail, err := metadata.Email("")
@@ -156,7 +193,6 @@ func ready(ctx context.Context, sc *spanner.Client) {
 		for {
 			_, err := iter.Next()
 			if err == iterator.Done {
-				fmt.Println("Ready Finish")
 				return
 			} else if err != nil {
 				fmt.Printf("try ready... next %d sec. %s\n", sleepSec, err)
