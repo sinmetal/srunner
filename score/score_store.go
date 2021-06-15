@@ -3,6 +3,7 @@ package score
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -25,6 +26,7 @@ type Score struct {
 	ClassRank  int64  // 6:10億以上,5:1億以上,4:1000万以上,3:100万以上,2:10万以上,1:10000以上,0:10000未満
 	CircleID   string `spanner:"CircleId"` // 所属しているサークル,100000種類ぐらい
 	Score      int64
+	Shard      int64 // 0 ~ 9
 	MaxScore   int64 // 過去最高スコア
 	CommitedAt time.Time
 }
@@ -69,6 +71,7 @@ func (s *ScoreStore) Upsert(ctx context.Context, e *Score) error {
 					"CircleId":   circleID,
 					"Score":      e.Score,
 					"MaxScore":   e.Score,
+					"Shard":      rand.Int63n(9),
 					"CommitedAt": spanner.CommitTimestamp,
 				})
 			} else {
@@ -87,6 +90,7 @@ func (s *ScoreStore) Upsert(ctx context.Context, e *Score) error {
 				"Id":         e.ID,
 				"Score":      e.Score,
 				"MaxScore":   maxScore,
+				"Shard":      rand.Int63n(9), // データがすべて埋まったら、これは消していい
 				"CommitedAt": spanner.CommitTimestamp,
 			})
 		}
