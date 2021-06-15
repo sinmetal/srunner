@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"github.com/sinmetal/srunner/log"
+	"github.com/sinmetal/srunner/score"
 	"github.com/sinmetal/srunner/tweet"
 	"golang.org/x/xerrors"
 )
@@ -23,8 +24,10 @@ var (
 )
 
 type RunnerV2 struct {
-	ts    tweet.TweetStore
-	endCh chan<- error
+	ts             tweet.TweetStore
+	scoreUserStore *score.ScoreUserStore
+	scoreStore     *score.ScoreStore
+	endCh          chan<- error
 }
 
 func (run *RunnerV2) outputMetrics(ctx context.Context, metricsID string, err error) {
@@ -469,6 +472,90 @@ func (run *RunnerV2) queryTweetLatestByAuthor(ctx context.Context, author string
 		_, err := run.ts.QueryLatestByAuthor(ctx, author, &exactStaleness30sec)
 		retCh <- err
 	}()
+	select {
+	case <-ctx.Done():
+		run.outputMetrics(ctx, metricsID, nil)
+	case err := <-retCh:
+		run.outputMetrics(ctx, metricsID, err)
+	}
+}
+
+func (run *RunnerV2) GoUpdateScore(concurrent int) {
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			t := time.NewTicker(200 * time.Millisecond)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					ctx := context.Background()
+					run.updateScore(ctx)
+				}
+			}
+		}()
+	}
+}
+
+func (run *RunnerV2) updateScore(ctx context.Context) {
+	ctx, span := startSpan(ctx, "goV2/updateScore")
+	defer span.End()
+
+	const metricsID = "UPDATE SCORE"
+
+	var cancel context.CancelFunc
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeoutDuration)
+		defer cancel()
+	}
+
+	retCh := make(chan error, 1)
+	go func(ctx context.Context) {
+		id := run.scoreUserStore.ID(ctx, rand.Int63n(1000000000))
+
+		// circleにある程度偏りをもたらす
+		var circleID int64
+		turningPoint := rand.Intn(100)
+		switch {
+		case turningPoint > 90:
+			{
+				circleID = rand.Int63n(100)
+			}
+		case turningPoint > 70:
+			{
+				circleID = rand.Int63n(5000)
+			}
+		case turningPoint > 40:
+			{
+				circleID = rand.Int63n(10000)
+			}
+		default:
+			circleID = rand.Int63n(100000)
+		}
+
+		// scoreにある程度偏りをもたらす
+		var value int64
+		turningPoint = rand.Intn(100)
+		switch {
+		case turningPoint > 98:
+			value = rand.Int63n(1100000000)
+		case turningPoint > 97:
+			value = rand.Int63n(1000000000)
+		case turningPoint > 96:
+			value = rand.Int63n(500000000)
+		case turningPoint > 95:
+			value = rand.Int63n(100000000)
+		case turningPoint > 94:
+			value = rand.Int63n(10000000)
+		default:
+			value = rand.Int63n(1000000)
+		}
+		err := run.scoreStore.Upsert(ctx, &score.Score{
+			ID:       id,
+			CircleID: run.scoreStore.CircleID(circleID),
+			Score:    value,
+		})
+		retCh <- err
+	}(ctx)
 	select {
 	case <-ctx.Done():
 		run.outputMetrics(ctx, metricsID, nil)
