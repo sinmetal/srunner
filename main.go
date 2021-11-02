@@ -12,6 +12,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/sinmetal/srunner/balance"
 	"github.com/sinmetal/srunner/log"
 	"github.com/sinmetal/srunner/score"
 	"github.com/sinmetal/srunner/tweet"
@@ -115,6 +116,11 @@ func main() {
 		panic(err)
 	}
 
+	balanceStore, err := balance.NewStore(ctx, sc)
+	if err != nil {
+		panic(err)
+	}
+
 	// ias := item.NewAllStore(ctx, sc)
 
 	endCh := make(chan error, 10)
@@ -123,6 +129,7 @@ func main() {
 		ts:             ts,
 		scoreStore:     scoreStore,
 		scoreUserStore: scoreUserStore,
+		balanceStore:   balanceStore,
 		endCh:          endCh,
 	}
 
@@ -139,7 +146,8 @@ func main() {
 	//runnerV2.GoGetTweet(concurrentReq5PerSec)
 	//runnerV2.GoQueryTweetLatestByAuthor(1) // 秒間 5回ほど, Author の種類が少ないので、同時実行無しで控えめ
 
-	runnerV2.GoUpdateScore(200) // すごい頑張ってみる
+	// runnerV2.GoUpdateScore(200) // すごい頑張ってみる
+	runnerV2.GoBalanceDeposit(100)
 	//goInsertTweet(ts, env.Goroutine, endCh)
 	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	// goInsertTweetWithFCFS(ts, env.Goroutine, endCh)
