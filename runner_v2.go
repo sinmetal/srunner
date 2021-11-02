@@ -9,6 +9,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
+	"github.com/sinmetal/srunner/balance"
 	"github.com/sinmetal/srunner/log"
 	"github.com/sinmetal/srunner/score"
 	"github.com/sinmetal/srunner/tweet"
@@ -27,6 +28,7 @@ type RunnerV2 struct {
 	ts             tweet.TweetStore
 	scoreUserStore *score.ScoreUserStore
 	scoreStore     *score.ScoreStore
+	balanceStore   *balance.Store
 	endCh          chan<- error
 }
 
@@ -554,6 +556,47 @@ func (run *RunnerV2) updateScore(ctx context.Context) {
 			CircleID: run.scoreStore.CircleID(circleID),
 			Score:    value,
 		})
+		retCh <- err
+	}(ctx)
+	select {
+	case <-ctx.Done():
+		run.outputMetrics(ctx, metricsID, nil)
+	case err := <-retCh:
+		run.outputMetrics(ctx, metricsID, err)
+	}
+}
+
+func (run *RunnerV2) GoBalanceDeposit(concurrent int) {
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			t := time.NewTicker(200 * time.Millisecond)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					ctx := context.Background()
+					run.deposit(ctx)
+				}
+			}
+		}()
+	}
+}
+
+func (run *RunnerV2) deposit(ctx context.Context) {
+	ctx, span := startSpan(ctx, "goV2/deposit")
+	defer span.End()
+
+	const metricsID = "DEPOSIT"
+
+	var cancel context.CancelFunc
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeoutDuration)
+		defer cancel()
+	}
+
+	retCh := make(chan error, 1)
+	go func(ctx context.Context) {
+		_, _, err := run.balanceStore.Deposit(ctx, fmt.Sprintf("user%08d", rand.Int63n(10000000)), 1000+rand.Int63n(9000), rand.Int63n(300))
 		retCh <- err
 	}(ctx)
 	select {
