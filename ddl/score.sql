@@ -14,4 +14,26 @@ CREATE TABLE Score (
   CommitedAt TIMESTAMP NOT NULL OPTIONS (
     allow_commit_timestamp = true
   ),
+  Shard INT64,
 ) PRIMARY KEY (Id);
+
+CREATE INDEX CommitedAtDescByScore
+ON Score (
+	CommitedAt DESC
+);
+
+CREATE INDEX ScoreByMaxScoreDesc
+ON Score (
+	MaxScore DESC
+);
+
+CREATE INDEX ScoreByScoreDesc
+ON Score (
+	Score DESC
+);
+
+CREATE INDEX ShardCommitedAtDescByScore
+ON Score (
+	Shard,
+	CommitedAt DESC
+);
