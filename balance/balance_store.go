@@ -62,6 +62,8 @@ func (s *Store) Deposit(ctx context.Context, userID string, amount int64, point 
 			if err := row.ToStruct(ub); err != nil {
 				return err
 			}
+			ub.Amount += amount
+			ub.Point += point
 		}
 		ub.UpdatedAt = spanner.CommitTimestamp
 		ubMu, err := spanner.InsertOrUpdateStruct(s.UserBalanceTable(), ub)
