@@ -21,8 +21,10 @@ func TestStore_Deposit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, err = bs.Deposit(ctx, "u100", 100, 100)
-	if err != nil {
-		t.Fatal(err)
+	for i := 0; i < 3; i++ {
+		_, _, err = bs.Deposit(ctx, "u100", 100, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }

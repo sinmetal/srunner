@@ -44,7 +44,7 @@ func (s *Store) UserDepositHistoryTable() string {
 }
 
 func (s *Store) Deposit(ctx context.Context, userID string, amount int64, point int64) (userBalance *UserBalance, userDepositHistories *UserDepositHistory, err error) {
-	var ub *UserBalance
+	ub := &UserBalance{}
 	var udh *UserDepositHistory
 	commitTime, err := s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
 		var mus []*spanner.Mutation
