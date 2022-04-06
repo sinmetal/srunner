@@ -6,6 +6,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
+	"github.com/sinmetal/srunner/spanners"
 	"google.golang.org/grpc/codes"
 )
 
@@ -46,7 +47,7 @@ func (s *Store) UserDepositHistoryTable() string {
 func (s *Store) Deposit(ctx context.Context, userID string, amount int64, point int64) (userBalance *UserBalance, userDepositHistories *UserDepositHistory, err error) {
 	ub := &UserBalance{}
 	var udh *UserDepositHistory
-	commitTime, err := s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
+	resp, err := s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
 		var mus []*spanner.Mutation
 		row, err := tx.ReadRow(ctx, s.UserBalanceTable(), spanner.Key{userID}, []string{"UserID", "Amount", "Point", "CreatedAt", "UpdatedAt"})
 		if spanner.ErrCode(err) == codes.NotFound {
@@ -89,12 +90,14 @@ func (s *Store) Deposit(ctx context.Context, userID string, amount int64, point 
 			return err
 		}
 		return nil
+	}, spanner.TransactionOptions{
+		TransactionTag: spanners.AppTag(),
 	})
 	if err != nil {
 		return nil, nil, err
 	}
-	ub.CreatedAt = commitTime
-	udh.CreatedAt = commitTime
+	ub.CreatedAt = resp.CommitTs
+	udh.CreatedAt = resp.CommitTs
 
 	return ub, udh, nil
 }
