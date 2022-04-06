@@ -417,7 +417,12 @@ func (s *defaultTweetStore) Update(ctx context.Context, id string) (*spanner.Com
 	defer span.End()
 
 	resp, err := s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-		tr, err := txn.ReadRow(ctx, s.TableName(), spanner.Key{id}, []string{"Count"})
+		tr, err := txn.ReadRowWithOptions(ctx, s.TableName(),
+			spanner.Key{id},
+			[]string{"Count"},
+			&spanner.ReadOptions{
+				RequestTag: spanners.AppTag(),
+			})
 		if err != nil {
 			return fmt.Errorf("failed spanner.ReadRow : %w", err)
 		}
