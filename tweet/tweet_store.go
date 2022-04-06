@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"github.com/sinmetal/srunner/operation"
+	"github.com/sinmetal/srunner/spanners"
 	"go.opencensus.io/trace"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
@@ -83,7 +84,7 @@ func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) error {
 		m,
 	}
 
-	_, err = s.sc.Apply(ctx, ms)
+	_, err = s.sc.Apply(ctx, ms, spanners.AppTransactionTagApplyOption())
 	if err != nil {
 		return fmt.Errorf("failed spanner.Apply: %w", err)
 	}
@@ -121,8 +122,10 @@ func (s *defaultTweetStore) InsertWithOperation(ctx context.Context, id string) 
 	}
 	ml = append(ml, tom)
 
-	_, err = s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+	_, err = s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		return txn.BufferWrite(ml)
+	}, spanner.TransactionOptions{
+		TransactionTag: spanners.AppTag(),
 	})
 
 	return err
@@ -132,7 +135,11 @@ func (s *defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, e
 	ctx, span := startSpan(ctx, "get")
 	defer span.End()
 
-	row, err := s.sc.Single().ReadRow(ctx, s.TableName(), key, []string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"})
+	row, err := s.sc.Single().ReadRowWithOptions(ctx, s.TableName(), key,
+		[]string{"Author", "CommitedAt", "Content", "CreatedAt", "Favos", "Sort", "UpdatedAt"},
+		&spanner.ReadOptions{
+			RequestTag: spanners.AppTag(),
+		})
 	if err != nil {
 		ecode := spanner.ErrCode(err)
 		if ecode == codes.NotFound {
@@ -152,7 +159,13 @@ func (s *defaultTweetStore) Query(ctx context.Context, limit int) ([]*Tweet, err
 	ctx, span := startSpan(ctx, "query")
 	defer span.End()
 
-	iter := s.sc.Single().WithTimestampBound(spanner.MaxStaleness(2*time.Second)).ReadUsingIndex(ctx, s.TableName(), "TweetSortAsc", spanner.AllKeys(), []string{"Id", "Sort"})
+	iter := s.sc.Single().WithTimestampBound(spanner.MaxStaleness(2*time.Second)).
+		ReadWithOptions(ctx, s.TableName(), spanner.AllKeys(),
+			[]string{"Id", "Sort"},
+			&spanner.ReadOptions{
+				Index:      "TweetSortAsc",
+				RequestTag: spanners.AppTag(),
+			})
 	defer iter.Stop()
 
 	count := 0
@@ -201,7 +214,10 @@ JOIN (
 JOIN User U ON IO.UserID = U.UserID
 `, rand.Int63())
 
-	iter := s.sc.Single().Query(ctx, spanner.NewStatement(fmt.Sprintf(sql)))
+	iter := s.sc.Single().QueryWithOptions(ctx, spanner.NewStatement(fmt.Sprintf(sql)),
+		spanner.QueryOptions{
+			RequestTag: spanners.AppTag(),
+		})
 	defer iter.Stop()
 
 	for {
@@ -221,7 +237,10 @@ func (s *defaultTweetStore) QueryHeavy(ctx context.Context) ([]*Tweet, error) {
 	ctx, span := startSpan(ctx, "queryHeavy")
 	defer span.End()
 
-	iter := s.sc.Single().Query(ctx, spanner.NewStatement("SELECT * FROM Tweet WHERE Content Like  '%Hoge%' LIMIT 100"))
+	iter := s.sc.Single().QueryWithOptions(ctx, spanner.NewStatement("SELECT * FROM Tweet WHERE Content Like  '%Hoge%' LIMIT 100"),
+		spanner.QueryOptions{
+			RequestTag: spanners.AppTag(),
+		})
 	defer iter.Stop()
 
 	count := 0
@@ -251,7 +270,11 @@ func (s *defaultTweetStore) QueryAll(ctx context.Context) (int, error) {
 	ctx, span := startSpan(ctx, "queryAll")
 	defer span.End()
 
-	iter := s.sc.Single().WithTimestampBound(spanner.ReadTimestamp(time.Now())).Query(ctx, spanner.NewStatement("SELECT * FROM Tweet"))
+	iter := s.sc.Single().WithTimestampBound(spanner.ReadTimestamp(time.Now())).
+		QueryWithOptions(ctx, spanner.NewStatement("SELECT * FROM Tweet"),
+			spanner.QueryOptions{
+				RequestTag: spanners.AppTag(),
+			})
 	defer iter.Stop()
 
 	count := 0
@@ -306,7 +329,9 @@ WHERE ShardCreatedAt = @ShardCreatedAt
 		roTx = roTx.WithTimestampBound(*timestampBound)
 	}
 
-	iter := roTx.Query(ctx, st)
+	iter := roTx.QueryWithOptions(ctx, st, spanner.QueryOptions{
+		RequestTag: spanners.AppTag(),
+	})
 	defer iter.Stop()
 
 	type Result struct {
@@ -361,7 +386,10 @@ LIMIT @Limit
 	st.Params["EndShard"] = endShard
 	st.Params["Id"] = pageOption.ID
 	st.Params["Limit"] = limit
-	iter := s.sc.Single().Query(ctx, st)
+	iter := s.sc.Single().QueryWithOptions(ctx, st,
+		spanner.QueryOptions{
+			RequestTag: spanners.AppTag(),
+		})
 	defer iter.Stop()
 
 	ts := []*Tweet{}
@@ -408,7 +436,10 @@ func (s *defaultTweetStore) Update(ctx context.Context, id string) (*spanner.Com
 			return fmt.Errorf("failed spanner.Tx.BufferWrite : %w", err)
 		}
 		return nil
-	}, spanner.TransactionOptions{CommitOptions: spanner.CommitOptions{ReturnCommitStats: true}})
+	}, spanner.TransactionOptions{
+		CommitOptions:  spanner.CommitOptions{ReturnCommitStats: true},
+		TransactionTag: spanners.AppTag(),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed TweetStore.Update : %w", err)
 	}
@@ -421,7 +452,7 @@ func (s *defaultTweetStore) UpdateDML(ctx context.Context, id string) (time.Time
 	ctx, span := startSpan(ctx, "updateDML")
 	defer span.End()
 
-	return s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+	resp, err := s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		stmt := spanner.Statement{
 			SQL: `UPDATE Tweet SET Count += 1, UpdatedAt = @UpdatedAt, CommitedAt = PENDING_COMMIT_TIMESTAMP() WHERE Id = @Id`,
 		}
@@ -434,7 +465,13 @@ func (s *defaultTweetStore) UpdateDML(ctx context.Context, id string) (time.Time
 			return err
 		}
 		return nil
+	}, spanner.TransactionOptions{
+		TransactionTag: spanners.AppTag(),
 	})
+	if err != nil {
+		return time.Time{}, err
+	}
+	return resp.CommitTs, nil
 }
 
 // Delete is 指定した ID の Row を削除する
@@ -442,7 +479,7 @@ func (s *defaultTweetStore) Delete(ctx context.Context, id string) error {
 	ctx, span := startSpan(ctx, "delete")
 	defer span.End()
 
-	_, err := s.sc.Apply(ctx, []*spanner.Mutation{spanner.Delete(s.TableName(), spanner.Key{id})})
+	_, err := s.sc.Apply(ctx, []*spanner.Mutation{spanner.Delete(s.TableName(), spanner.Key{id})}, spanners.AppTransactionTagApplyOption())
 	if err != nil {
 		return err
 	}
@@ -495,8 +532,10 @@ func (s *defaultTweetStore) InsertBench(ctx context.Context, id string) error {
 		}
 		ml = append(ml, tdm)
 	}
-	_, err = s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+	_, err = s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		return txn.BufferWrite(ml)
+	}, spanner.TransactionOptions{
+		TransactionTag: spanners.AppTag(),
 	})
 
 	return err
@@ -515,7 +554,10 @@ FROM Tweet WHERE Author = @Author ORDER BY CreatedAt DESC LIMIT @Limit`)
 	if tb != nil {
 		roTx = roTx.WithTimestampBound(*tb)
 	}
-	iter := roTx.Query(ctx, stm)
+	iter := roTx.QueryWithOptions(ctx, stm,
+		spanner.QueryOptions{
+			RequestTag: spanners.AppTag(),
+		})
 	defer iter.Stop()
 	for {
 		row, err := iter.Next()
