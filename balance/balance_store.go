@@ -49,7 +49,12 @@ func (s *Store) Deposit(ctx context.Context, userID string, amount int64, point 
 	var udh *UserDepositHistory
 	resp, err := s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
 		var mus []*spanner.Mutation
-		row, err := tx.ReadRow(ctx, s.UserBalanceTable(), spanner.Key{userID}, []string{"UserID", "Amount", "Point", "CreatedAt", "UpdatedAt"})
+		row, err := tx.ReadRowWithOptions(ctx, s.UserBalanceTable(),
+			spanner.Key{userID},
+			[]string{"UserID", "Amount", "Point", "CreatedAt", "UpdatedAt"},
+			&spanner.ReadOptions{
+				RequestTag: spanners.AppTag(),
+			})
 		if spanner.ErrCode(err) == codes.NotFound {
 			ub = &UserBalance{
 				UserID:    userID,
