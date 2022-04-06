@@ -18,5 +18,5 @@ func AppTag(tags ...string) string {
 	for i, tag := range tags {
 		l[i+1] = tag
 	}
-	return strings.Join(tags, ",")
+	return strings.Join(l, ",")
 }
