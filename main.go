@@ -148,6 +148,7 @@ func main() {
 
 	// runnerV2.GoUpdateScore(200) // すごい頑張ってみる
 	runnerV2.GoBalanceDeposit(100)
+	runnerV2.GoBalanceListDepositHistory(100)
 	//goInsertTweet(ts, env.Goroutine, endCh)
 	// goInsertTweetBenchmark(ts, env.Goroutine, endCh)
 	// goInsertTweetWithFCFS(ts, env.Goroutine, endCh)

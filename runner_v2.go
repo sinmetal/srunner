@@ -606,3 +606,44 @@ func (run *RunnerV2) deposit(ctx context.Context) {
 		run.outputMetrics(ctx, metricsID, err)
 	}
 }
+
+func (run *RunnerV2) GoBalanceListDepositHistory(concurrent int) {
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			t := time.NewTicker(200 * time.Millisecond)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					ctx := context.Background()
+					run.deposit(ctx)
+				}
+			}
+		}()
+	}
+}
+
+func (run *RunnerV2) depositHistory(ctx context.Context) {
+	ctx, span := startSpan(ctx, "goV2/depositHistory")
+	defer span.End()
+
+	const metricsID = "DEPOSIT HISTORY"
+
+	var cancel context.CancelFunc
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		ctx, cancel = context.WithTimeout(ctx, defaultTimeoutDuration)
+		defer cancel()
+	}
+
+	retCh := make(chan error, 1)
+	go func(ctx context.Context) {
+		_, err := run.balanceStore.ListDepositHistoryByUserID(ctx, fmt.Sprintf("user%08d", rand.Int63n(10000000)), 25)
+		retCh <- err
+	}(ctx)
+	select {
+	case <-ctx.Done():
+		run.outputMetrics(ctx, metricsID, nil)
+	case err := <-retCh:
+		run.outputMetrics(ctx, metricsID, err)
+	}
+}
