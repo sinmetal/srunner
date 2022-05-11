@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"github.com/sinmetal/srunner/spanners"
+	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 )
 
@@ -105,4 +106,28 @@ func (s *Store) Deposit(ctx context.Context, userID string, amount int64, point 
 	udh.CreatedAt = resp.CommitTs
 
 	return ub, udh, nil
+}
+
+func (s *Store) ListDepositHistoryByUserID(ctx context.Context, userID string, limit int64) (userDepositHistories []*UserDepositHistory, err error) {
+	stm := spanner.NewStatement(`SELECT * FROM UserDepositHistory WHERE UserID="@UserID" ORDER BY CreatedAt DESC LIMIT @Limit`)
+	stm.Params["UserID"] = userID
+	stm.Params["Limit"] = limit
+
+	iter := s.sc.ReadOnlyTransaction().Query(ctx, stm)
+	defer iter.Stop()
+
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			return userDepositHistories, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		v := UserDepositHistory{}
+		if err := row.ToStruct(&v); err != nil {
+			return nil, err
+		}
+		userDepositHistories = append(userDepositHistories, &v)
+	}
 }

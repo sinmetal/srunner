@@ -19,6 +19,12 @@ ON UserDepositHistory (
 	UserID
 );
 
+CREATE INDEX UserIDCreatedAtDescByUserDepositHistory
+ON UserDepositHistory (
+    UserID,
+    CreatedAt DESC
+);
+
 CREATE INDEX UserIDStoredAmountAndPointByUserDepositHistory
 ON UserDepositHistory (
 	UserID
