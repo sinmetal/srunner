@@ -24,9 +24,8 @@ require (
 	github.com/sinmetalcraft/gcpbox v1.18.2
 	github.com/tenntenn/sync v0.0.0-20180624231837-38c46c280d9d
 	go.opencensus.io v0.23.0
-	golang.org/x/net v0.0.0-20220403103023-749bd193bc2b // indirect
+	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220309155454-6242fa91716a
-	golang.org/x/sys v0.0.0-20220405210540-1e041c57c461 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	google.golang.org/api v0.74.0
 	google.golang.org/genproto v0.0.0-20220405205423-9d709892a2bf
