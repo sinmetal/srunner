@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -13,8 +16,17 @@ import (
 	"github.com/sinmetal/srunner/tweet"
 )
 
+var shutdownChan = make(chan bool)
+var signalChan chan (os.Signal) = make(chan os.Signal, 1)
+
 func main() {
 	ctx := context.Background()
+
+	log.Println("Ignition srunner")
+
+	// SIGINT handles Ctrl+C locally.
+	// SIGTERM handles Cloud Run termination signal.
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	spannerProjectID := os.Getenv("SRUNNER_SPANNER_PROJECT_ID")
 	spannerInstanceID := os.Getenv("SRUNNER_SPANNER_INSTANCE_ID")
@@ -28,25 +40,43 @@ func main() {
 	}
 
 	ts := tweet.NewStore(sc)
-	for {
-		ctx := context.Background()
-		id := uuid.New().String()
-		now := time.Now()
-		author := randdata.GetAuthor()
-		favos := randdata.GetAuthors()
-		_, err := ts.Insert(ctx, &tweet.Tweet{
-			TweetID:       id,
-			Author:        author,
-			Content:       fmt.Sprintf("Hello. My name is %s. %s (%s*%s*%s)", author, now, uuid.New().String(), uuid.New().String(), uuid.New().String()),
-			Favos:         favos,
-			Sort:          rand.Int63(),
-			CreatedAt:     now,
-			UpdatedAt:     now,
-			CommitedAt:    spanner.CommitTimestamp,
-			SchemaVersion: 1,
-		})
-		if err != nil {
-			fmt.Printf("failed TweetStore.Insert() id=%s err=%s\n", id, err)
+
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-shutdownChan:
+				log.Println("stop logic")
+				sc.Close()
+				return
+			default:
+				id := uuid.New().String()
+				now := time.Now()
+				author := randdata.GetAuthor()
+				favos := randdata.GetAuthors()
+				_, err := ts.Insert(ctx, &tweet.Tweet{
+					TweetID:       id,
+					Author:        author,
+					Content:       fmt.Sprintf("Hello. My name is %s. %s (%s*%s*%s)", author, now, uuid.New().String(), uuid.New().String(), uuid.New().String()),
+					Favos:         favos,
+					Sort:          rand.Int63(),
+					CreatedAt:     now,
+					UpdatedAt:     now,
+					CommitedAt:    spanner.CommitTimestamp,
+					SchemaVersion: 1,
+				})
+				if err != nil {
+					fmt.Printf("failed TweetStore.Insert() id=%s err=%s\n", id, err)
+				}
+			}
 		}
-	}
+	}(ctx)
+
+	// Receive output from signalChan.
+	sig := <-signalChan
+	log.Printf("%s signal caught", sig)
+
+	time.Sleep(10 * time.Second)
+	shutdownChan <- true
+
+	log.Println("Shutdown srunner")
 }
