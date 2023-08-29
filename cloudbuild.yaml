@@ -11,7 +11,7 @@ steps:
     - 'SPANNER_EMULATOR_HOST=spanner-emulator:9010'
 - name: 'golang:1.21-bullseye'
   entrypoint: 'go'
-  args: ['build', '.']
+  args: ['build', '-o', 'app', 'github.com/sinmetal/srunner/cmd/server/tweet']
   env: ['CGO_ENABLED=0']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '--tag=gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA', '.']
