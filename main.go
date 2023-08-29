@@ -15,6 +15,7 @@ import (
 	"github.com/sinmetal/srunner/balance"
 	"github.com/sinmetal/srunner/log"
 	"github.com/sinmetal/srunner/score"
+	"github.com/sinmetal/srunner/spanners"
 	"github.com/sinmetal/srunner/tweet"
 	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 	"go.opencensus.io/trace"
@@ -95,7 +96,7 @@ func main() {
 		panic(err)
 	}
 
-	sc, err := createClient(ctx, env.SpannerDatabase,
+	sc, err := spanners.CreateClient(ctx, env.SpannerDatabase,
 		option.WithGRPCDialOption(grpc.WithUnaryInterceptor(GFEMetricsUnaryClientInterceptor())),
 		option.WithGRPCDialOption(grpc.WithStreamInterceptor(GFEMetricsStreamClientInterceptor())),
 		option.WithTokenSource(tokenSource),
@@ -106,7 +107,7 @@ func main() {
 
 	ready(ctx, sc)
 
-	ts := tweet.NewTweetStore(sc)
+	ts := tweet.NewStore(sc)
 	scoreUserStore, err := score.NewScoreUserStore(ctx, sc)
 	if err != nil {
 		panic(err)

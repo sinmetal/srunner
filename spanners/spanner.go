@@ -1,4 +1,4 @@
-package main
+package spanners
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 	"google.golang.org/api/option"
 )
 
-func createClient(ctx context.Context, db string, o ...option.ClientOption) (*spanner.Client, error) {
+func CreateClient(ctx context.Context, db string, o ...option.ClientOption) (*spanner.Client, error) {
 	config := spanner.ClientConfig{
 		SessionPoolConfig: spanner.SessionPoolConfig{
 			MinOpened:           400,
-			MaxOpened:           1000,
+			MaxOpened:           600,
 			TrackSessionHandles: true,
 		},
 	}
