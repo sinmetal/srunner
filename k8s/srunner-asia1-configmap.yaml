@@ -1,8 +1,0 @@
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: srunner-asia1-config
-data:
-  SRUNNER_SPANNERDATABASE: projects/{project-id}/instances/asia1-20201208/databases/sinmetal
-  SRUNNER_GOROUTINE: "30"
-  SRUNNER_TRACEPREFIX: "asia1"

@@ -36,3 +36,7 @@ kubectl annotate serviceaccount metalapps-default \
     --namespace metalapps \
     iam.gke.io/gcp-service-account=metalapps@GSA_PROJECT.iam.gserviceaccount.com
 ```
+
+```
+kubectl apply -f k8s/srunner-configmap.yaml
+```
