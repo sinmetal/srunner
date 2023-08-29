@@ -12,8 +12,10 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
+	"github.com/sinmetal/srunner/auth"
 	"github.com/sinmetal/srunner/randdata"
 	"github.com/sinmetal/srunner/tweet"
+	"google.golang.org/api/option"
 )
 
 var shutdownChan = make(chan bool)
@@ -34,7 +36,13 @@ func main() {
 
 	dbName := fmt.Sprintf("projects/%s/instances/%s/databases/%s", spannerProjectID, spannerInstanceID, spannerDatabaseID)
 	fmt.Println(dbName)
-	sc, err := spanner.NewClient(ctx, dbName)
+
+	tokenSource, err := auth.DefaultTokenSourceWithProactiveCache(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	sc, err := spanner.NewClient(ctx, dbName, option.WithTokenSource(tokenSource))
 	if err != nil {
 		panic(err)
 	}
