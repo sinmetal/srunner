@@ -24,7 +24,7 @@ var signalChan chan (os.Signal) = make(chan os.Signal, 1)
 func main() {
 	ctx := context.Background()
 
-	log.Println("Ignition srunner")
+	fmt.Println("Ignition srunner")
 
 	// SIGINT handles Ctrl+C locally.
 	// SIGTERM handles Cloud Run termination signal.
@@ -53,7 +53,7 @@ func main() {
 		for {
 			select {
 			case <-shutdownChan:
-				log.Println("stop logic")
+				fmt.Println("stop logic")
 				sc.Close()
 				return
 			default:
@@ -73,7 +73,7 @@ func main() {
 					SchemaVersion: 1,
 				})
 				if err != nil {
-					fmt.Printf("failed TweetStore.Insert() id=%s err=%s\n", id, err)
+					log.Printf("failed TweetStore.Insert() id=%s err=%s\n", id, err)
 				}
 			}
 		}
@@ -81,10 +81,10 @@ func main() {
 
 	// Receive output from signalChan.
 	sig := <-signalChan
-	log.Printf("%s signal caught", sig)
+	fmt.Printf("%s signal caught", sig)
 
 	time.Sleep(10 * time.Second)
 	shutdownChan <- true
 
-	log.Println("Shutdown srunner")
+	fmt.Println("Shutdown srunner")
 }
