@@ -15,7 +15,10 @@ spec:
       labels:
         app: srunner-dep
     spec:
-      serviceAccountName: metalapps-sa
+      serviceAccountName: metalapps-default
+      nodeSelector:
+        iam.gke.io/gke-metadata-server-enabled: "true"
+        cloud.google.com/gke-spot: "true"
       containers:
         - name: srunner-dep
           image: asia-northeast1-docker.pkg.dev/$PROJECT_ID/srunner/$BRANCH_NAME:$COMMIT_SHA

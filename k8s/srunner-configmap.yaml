@@ -4,6 +4,6 @@ metadata:
   name: srunner-config
   namespace: metalapps
 data:
-  SRUNNER_SPANNERDATABASE: projects/{project-id}/instances/{instance-id}/databases/{database}
-  SRUNNER_GOROUTINE: "30"
-  SRUNNER_TRACEPREFIX: "tokyo"
+  SRUNNER_SPANNER_PROJECT_ID: gcpug-public-spanner
+  SRUNNER_SPANNER_INSTANCE_ID: merpay-sponsored-instance
+  SRUNNER_SPANNER_DATABASE_ID: sinmetal
