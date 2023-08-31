@@ -1,34 +1,59 @@
 module github.com/sinmetal/srunner
 
-go 1.12
+go 1.21
 
 require (
-	cloud.google.com/go/compute v1.5.0
-	cloud.google.com/go/monitoring v1.4.0 // indirect
-	cloud.google.com/go/spanner v1.30.1
-	cloud.google.com/go/trace v1.2.0 // indirect
-	contrib.go.opencensus.io/exporter/stackdriver v0.13.10
+	cloud.google.com/go/compute v1.23.0
+	cloud.google.com/go/compute/metadata v0.2.3
+	cloud.google.com/go/spanner v1.47.0
+	contrib.go.opencensus.io/exporter/stackdriver v0.13.14
 	github.com/apstndb/tokensource v0.0.0-20210616073644-29566afe9c47
-	github.com/aws/aws-sdk-go v1.43.33 // indirect
-	github.com/cenkalti/backoff/v4 v4.1.2
-	github.com/cncf/xds/go v0.0.0-20220330162227-eded343319d0 // indirect
-	github.com/envoyproxy/protoc-gen-validate v0.6.7 // indirect
+	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/google/uuid v1.3.0
-	github.com/googleapis/gax-go/v2 v2.2.0
-	github.com/hashicorp/errwrap v1.1.0 // indirect
-	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/googleapis/gax-go/v2 v2.12.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/morikuni/failure v0.14.0
+	github.com/morikuni/failure v1.1.2
 	github.com/pkg/errors v0.9.1
 	github.com/sinmetal/stats v0.0.0-20200729075943-a049b20fc260
-	github.com/sinmetalcraft/gcpbox v1.18.2
+	github.com/sinmetalcraft/gcpbox v1.21.0
 	github.com/tenntenn/sync v0.0.0-20180624231837-38c46c280d9d
-	go.opencensus.io v0.23.0
-	golang.org/x/net v0.0.0-20220403103023-749bd193bc2b // indirect
-	golang.org/x/oauth2 v0.0.0-20220309155454-6242fa91716a
-	golang.org/x/sys v0.0.0-20220405210540-1e041c57c461 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
-	google.golang.org/api v0.74.0
-	google.golang.org/genproto v0.0.0-20220405205423-9d709892a2bf
-	google.golang.org/grpc v1.45.0
+	go.opencensus.io v0.24.0
+	golang.org/x/oauth2 v0.11.0
+	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
+	google.golang.org/api v0.137.0
+	google.golang.org/genproto v0.0.0-20230814215434-ca7cfce7776a
+	google.golang.org/grpc v1.57.0
+)
+
+require (
+	cloud.google.com/go v0.110.7 // indirect
+	cloud.google.com/go/iam v1.1.2 // indirect
+	cloud.google.com/go/longrunning v0.5.1 // indirect
+	cloud.google.com/go/monitoring v1.15.1 // indirect
+	cloud.google.com/go/trace v1.10.1 // indirect
+	github.com/aws/aws-sdk-go v1.44.323 // indirect
+	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/cncf/udpa/go v0.0.0-20220112060539-c52dc94e7fbe // indirect
+	github.com/cncf/xds/go v0.0.0-20230607035331-e9ce68804cb4 // indirect
+	github.com/envoyproxy/go-control-plane v0.11.1 // indirect
+	github.com/envoyproxy/protoc-gen-validate v1.0.2 // indirect
+	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/s2a-go v0.1.5 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.2.5 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/prometheus/prometheus v0.46.0 // indirect
+	golang.org/x/crypto v0.12.0 // indirect
+	golang.org/x/net v0.14.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/text v0.12.0 // indirect
+	google.golang.org/appengine v1.6.7 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20230814215434-ca7cfce7776a // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230814215434-ca7cfce7776a // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
 )

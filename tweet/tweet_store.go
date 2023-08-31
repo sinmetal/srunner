@@ -8,20 +8,16 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
-	"github.com/google/uuid"
-	"github.com/sinmetal/srunner/operation"
 	"github.com/sinmetal/srunner/spanners"
 	"go.opencensus.io/trace"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 )
 
-// TweetStore is TweetTable Functions
-type TweetStore interface {
+// Store is TweetTable Functions
+type Store interface {
 	TableName() string
-	Insert(ctx context.Context, tweet *Tweet) error
-	InsertBench(ctx context.Context, id string) error
-	InsertWithOperation(ctx context.Context, id string) error
+	Insert(ctx context.Context, tweet *Tweet) (time.Time, error)
 	Update(ctx context.Context, id string) (*spanner.CommitResponse, error)
 	UpdateDML(ctx context.Context, id string) (time.Time, error)
 	Delete(ctx context.Context, id string) error
@@ -32,13 +28,12 @@ type TweetStore interface {
 	QueryResultStruct(ctx context.Context, orderByAsc bool, limit int, tb *spanner.TimestampBound) ([]*TweetIDAndAuthor, error)
 	QueryOrderByCreatedAtDesc(ctx context.Context, startShard int, endShard int, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error)
 	QueryRandom(ctx context.Context) error
-	QueryLatestByAuthor(ctx context.Context, author string, tb *spanner.TimestampBound) ([]*Tweet, error)
 }
 
-var tweetStore TweetStore
+var tweetStore Store
 
-// NewTweetStore is New TweetStore
-func NewTweetStore(sc *spanner.Client) TweetStore {
+// NewStore is New TweetStore
+func NewStore(sc *spanner.Client) Store {
 	if tweetStore != nil {
 		return tweetStore
 	}
@@ -49,17 +44,37 @@ func NewTweetStore(sc *spanner.Client) TweetStore {
 
 // Tweet is TweetTable Row
 type Tweet struct {
-	ID             string `spanner:"Id"`
-	Author         string
-	Content        string
-	Count          int64
-	Favos          []string
-	Sort           int64
-	ShardCreatedAt int64
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	CommitedAt     time.Time
-	SchemaVersion  int64
+	TweetID       string
+	Author        string
+	Content       string
+	ContentLength int64 // generated columns
+	Favos         []string
+	Sort          int64
+	ShardID       int64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	CommitedAt    time.Time // allow_commit_timestamp
+	SchemaVersion int64
+}
+
+// ToInsertOrUpdateMap is Tweet structから、InsertOrUpdateができないColumnを取り除いたmapを作る
+//
+// InsertOrUpdateができないColumnとしては、generated columnsで生成されるcolumnがある
+func (t *Tweet) ToInsertOrUpdateMap() map[string]interface{} {
+	shardID := int64(crc32.ChecksumIEEE([]byte(t.TweetID)) % 10)
+	m := map[string]interface{}{
+		"TweetID":       t.TweetID,
+		"Author":        t.Author,
+		"Content":       t.Content,
+		"Favos":         t.Favos,
+		"Sort":          t.Sort,
+		"ShardID":       shardID,
+		"CreatedAt":     t.CreatedAt,
+		"UpdatedAt":     t.UpdatedAt,
+		"CommitedAt":    spanner.CommitTimestamp,
+		"SchemaVersion": t.SchemaVersion,
+	}
+	return m
 }
 
 type defaultTweetStore struct {
@@ -68,67 +83,26 @@ type defaultTweetStore struct {
 
 // TableName is return Table Name for Spanner
 func (s *defaultTweetStore) TableName() string {
-	return "Tweet"
+	return "Tweets"
 }
 
 // Insert is Insert to Tweet
-func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) error {
+func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) (commitTimestamp time.Time, err error) {
 	ctx, span := startSpan(ctx, "insert")
 	defer span.End()
 
-	m, err := spanner.InsertStruct(s.TableName(), tweet)
-	if err != nil {
-		return fmt.Errorf("failed spanner.InsertStruct: %w", err)
-	}
+	in := tweet.ToInsertOrUpdateMap()
+	m := spanner.InsertMap(s.TableName(), in)
 	ms := []*spanner.Mutation{
 		m,
 	}
 
-	_, err = s.sc.Apply(ctx, ms, spanners.AppTransactionTagApplyOption())
+	commitTimestamp, err = s.sc.Apply(ctx, ms, spanners.AppTransactionTagApplyOption())
 	if err != nil {
-		return fmt.Errorf("failed spanner.Apply: %w", err)
+		return time.Time{}, fmt.Errorf("failed spanner.Apply: %w", err)
 	}
 
-	return nil
-}
-
-// InsertWithOperation is Tweet Table と Operation Table に Insertを行う
-func (s *defaultTweetStore) InsertWithOperation(ctx context.Context, id string) error {
-	ctx, span := startSpan(ctx, "insertWithOperation")
-	defer span.End()
-
-	ml := []*spanner.Mutation{}
-	now := time.Now()
-
-	shardId := crc32.ChecksumIEEE([]byte(now.String())) % 10
-	t := &Tweet{
-		ID:             id,
-		Content:        id,
-		Favos:          []string{},
-		ShardCreatedAt: int64(shardId),
-		CreatedAt:      now,
-		UpdatedAt:      now,
-		CommitedAt:     spanner.CommitTimestamp,
-	}
-	tm, err := spanner.InsertStruct(s.TableName(), t)
-	if err != nil {
-		return err
-	}
-	ml = append(ml, tm)
-
-	tom, err := operation.NewOperationInsertMutation(uuid.New().String(), "INSERT", "", s.TableName(), t)
-	if err != nil {
-		return err
-	}
-	ml = append(ml, tom)
-
-	_, err = s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-		return txn.BufferWrite(ml)
-	}, spanner.TransactionOptions{
-		TransactionTag: spanners.AppTag(),
-	})
-
-	return err
+	return commitTimestamp, nil
 }
 
 func (s *defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, error) {
@@ -161,9 +135,9 @@ func (s *defaultTweetStore) Query(ctx context.Context, limit int) ([]*Tweet, err
 
 	iter := s.sc.Single().WithTimestampBound(spanner.MaxStaleness(2*time.Second)).
 		ReadWithOptions(ctx, s.TableName(), spanner.AllKeys(),
-			[]string{"Id", "Sort"},
+			[]string{"TweetId", "Sort"},
 			&spanner.ReadOptions{
-				Index:      "TweetSortAsc",
+				Index:      "TweetBySort",
 				RequestTag: spanners.AppTag(),
 			})
 	defer iter.Stop()
@@ -489,93 +463,4 @@ func (s *defaultTweetStore) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	return nil
-}
-
-// InsertBench is 複数TableへのInsertを行う
-func (s *defaultTweetStore) InsertBench(ctx context.Context, id string) error {
-	ctx, span := startSpan(ctx, "insertbench")
-	defer span.End()
-
-	ml := []*spanner.Mutation{}
-	now := time.Now()
-
-	shardId := crc32.ChecksumIEEE([]byte(now.String())) % 10
-	t := &Tweet{
-		ID:             id,
-		Content:        id,
-		Favos:          []string{},
-		ShardCreatedAt: int64(shardId),
-		CreatedAt:      now,
-		UpdatedAt:      now,
-		CommitedAt:     spanner.CommitTimestamp,
-	}
-	tm, err := spanner.InsertStruct(s.TableName(), t)
-	if err != nil {
-		return err
-	}
-	ml = append(ml, tm)
-
-	tom, err := operation.NewOperationInsertMutation(uuid.New().String(), "INSERT", "", s.TableName(), t)
-	if err != nil {
-		return err
-	}
-	ml = append(ml, tom)
-
-	for i := 1; i < 4; i++ {
-		td := &Tweet{
-			ID:             id,
-			Content:        id,
-			Favos:          []string{},
-			ShardCreatedAt: int64(shardId),
-			CreatedAt:      now,
-			UpdatedAt:      now,
-			CommitedAt:     spanner.CommitTimestamp,
-		}
-		tdm, err := spanner.InsertStruct(fmt.Sprintf("TweetDummy%d", i), td)
-		if err != nil {
-			return err
-		}
-		ml = append(ml, tdm)
-	}
-	_, err = s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-		return txn.BufferWrite(ml)
-	}, spanner.TransactionOptions{
-		TransactionTag: spanners.AppTag(),
-	})
-
-	return err
-}
-
-// InsertBench is 複数TableへのInsertを行う
-func (s *defaultTweetStore) QueryLatestByAuthor(ctx context.Context, author string, tb *spanner.TimestampBound) ([]*Tweet, error) {
-	stm := spanner.NewStatement(
-		`SELECT Id, Author, Content, Count, Favos, Sort, ShardCreatedAt, CreatedAt, UpdatedAt, CommitedAt, SchemaVersion 
-FROM Tweet WHERE Author = @Author ORDER BY CreatedAt DESC LIMIT @Limit`)
-	stm.Params["Author"] = author
-	stm.Params["Limit"] = 50
-
-	var results []*Tweet
-	roTx := s.sc.Single()
-	if tb != nil {
-		roTx = roTx.WithTimestampBound(*tb)
-	}
-	iter := roTx.QueryWithOptions(ctx, stm,
-		spanner.QueryOptions{
-			RequestTag: spanners.AppTag(),
-		})
-	defer iter.Stop()
-	for {
-		row, err := iter.Next()
-		if err == iterator.Done {
-			return results, nil
-		} else if err != nil {
-			return nil, err
-		}
-
-		t := &Tweet{}
-		if err := row.ToStruct(t); err != nil {
-			return nil, err
-		}
-		results = append(results, t)
-	}
 }

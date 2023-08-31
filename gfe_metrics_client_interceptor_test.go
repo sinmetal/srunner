@@ -10,6 +10,7 @@ import (
 	sapiv1 "cloud.google.com/go/spanner/apiv1"
 	"github.com/google/uuid"
 	"github.com/googleapis/gax-go/v2"
+	"github.com/sinmetal/srunner/spanners"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	spannerpb "google.golang.org/genproto/googleapis/spanner/v1"
@@ -73,16 +74,10 @@ func TestGFEMetricsClientInterceptor(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Need to specify scope for the specific service.
-	tokenSource, err := DefaultTokenSourceWithProactiveCache(ctx, spanner.Scope)
-	if err != nil {
-		panic(err)
-	}
-
-	sc, err := createClient(ctx, gcpugPublicSpannerDB,
+	sc, err := spanners.CreateClient(ctx, gcpugPublicSpannerDB,
 		option.WithGRPCDialOption(grpc.WithUnaryInterceptor(GFEMetricsUnaryClientInterceptor())),
 		option.WithGRPCDialOption(grpc.WithStreamInterceptor(GFEMetricsStreamClientInterceptor())),
-		option.WithTokenSource(tokenSource))
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

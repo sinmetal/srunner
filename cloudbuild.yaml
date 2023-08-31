@@ -3,16 +3,16 @@ steps:
   args: ['run', '-d', '--network=cloudbuild', '-p', '9010:9010', '-p', '9020:9020', '--name=spanner-emulator', 'gcr.io/cloud-spanner-emulator/emulator']
 - name: jwilder/dockerize:0.6.1
   args: ['dockerize', '-timeout=60s', '-wait=tcp://spanner-emulator:9020']
-- name: 'golang:1.15-buster'
+- name: 'golang:1.21-bullseye'
   entrypoint: 'go'
   args: ['test', '-v', './...']
   env:
     - 'GO111MODULE=on'
     - 'SPANNER_EMULATOR_HOST=spanner-emulator:9010'
-- name: 'golang:1.15-buster'
+- name: 'golang:1.21-bullseye'
   entrypoint: 'go'
-  args: ['build', '.']
-  env: ['GO111MODULE=on']
+  args: ['build', '-o', 'app', 'github.com/sinmetal/srunner/cmd/server/tweet']
+  env: ['CGO_ENABLED=0']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '--tag=gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA', '.']
 - name: 'gcr.io/cloud-builders/kubectl'
@@ -24,5 +24,5 @@ steps:
     - --namespace=metalapps
   env:
     - 'CLOUDSDK_COMPUTE_REGION=asia-northeast1'
-    - 'CLOUDSDK_CONTAINER_CLUSTER=sinmetal-tokyo-a'
+    - 'CLOUDSDK_CONTAINER_CLUSTER=cluster1'
 images: ['gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA']
