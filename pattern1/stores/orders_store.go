@@ -67,7 +67,7 @@ func (s *OrdersStore) Insert(ctx context.Context, userID string, orderID string,
 	var ms []*spanner.Mutation
 	var amount int64
 	for _, detail := range details {
-		m := spanner.UpdateMap(s.OrderDetailsTableName(), detail.ToInsertMap())
+		m := spanner.InsertMap(s.OrderDetailsTableName(), detail.ToInsertMap())
 		ms = append(ms, m)
 		amount += detail.Price * detail.Quantity
 	}
@@ -76,8 +76,10 @@ func (s *OrdersStore) Insert(ctx context.Context, userID string, orderID string,
 		UserID:  userID,
 		Amount:  amount,
 	}
-	m := spanner.UpdateMap(s.OrderTableName(), order.ToInsertMap())
-	ms = append(ms, m)
+
+	orderMutation := spanner.InsertMap(s.OrderTableName(), order.ToInsertMap())
+	ms = append(ms, orderMutation)
+
 	commitTimestamp, err := s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
 		return tx.BufferWrite(ms)
 	})
