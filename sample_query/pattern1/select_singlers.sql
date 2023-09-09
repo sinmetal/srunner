@@ -1,0 +1,17 @@
+CREATE TABLE Singers (
+  SingerId INT64 NOT NULL,
+  FirstName STRING(1024) NOT NULL,
+  LastName STRING(1024) NOT NULL,
+) PRIMARY KEY (SingerId);
+
+CREATE TABLE Albums (
+  SingerId INT64 NOT NULL,
+  AlbumId INT64 NOT NULL,
+  Title STRING(1024) NOT NULL,
+) PRIMARY KEY (SingerId, AlbumId);
+
+CREATE TABLE Concerts (
+  SingerId INT64 NOT NULL,
+  ConcertId INT64 NOT NULL,
+  Price INT64 NOT NULL,
+) PRIMARY KEY (SingerId, ConcertId);
