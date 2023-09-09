@@ -31,11 +31,14 @@ func init() {
 	}
 }
 
+var allAuthor = []string{"gold", "silver", "dia", "ruby", "sapphire"}
+
+// GetAuthor is randomに1人返す
 func GetAuthor() string {
-	c := []string{"gold", "silver", "dia", "ruby", "sapphire"}
-	return c[rand.Intn(len(c))]
+	return allAuthor[rand.Intn(len(allAuthor))]
 }
 
+// GetAuthors is randomに数人返す
 func GetAuthors() []string {
 	exists := make(map[string]string)
 
@@ -50,6 +53,11 @@ func GetAuthors() []string {
 		authors = append(authors, k)
 	}
 	return authors
+}
+
+// GetAllAuthors is 全員返す
+func GetAllAuthors() []string {
+	return allAuthor
 }
 
 func GetItemsAllPattern1() [4]*stores1.Item {
