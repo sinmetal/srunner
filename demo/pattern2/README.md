@@ -1,4 +1,11 @@
 ```
+INSERT INTO Users (UserID, UserName, CreatedAt, UpdatedAt) VALUES ("sinmetal", "sinmetal", PENDING_COMMIT_TIMESTAMP(), PENDING_COMMIT_TIMESTAMP());
+INSERT INTO Orders(UserID, OrderID, Amount, CommitedAt) VALUES ("sinmetal","10ac9c3c-2e21-460e-be22-4527c11c1285", 1000, PENDING_COMMIT_TIMESTAMP());
+INSERT INTO OrderDetails(UserID, OrderID, OrderDetailID, ItemID, Price, Quantity, CommitedAt) VALUES("sinmetal", "10ac9c3c-2e21-460e-be22-4527c11c1285", "aa83e8d5-7d1f-4421-a263-5c16de1ac3e3", 1, 1000, 1, PENDING_COMMIT_TIMESTAMP());
+```
+
+
+```
 EXPLAIN ANALYZE
 WITH
   TargetOrders AS (

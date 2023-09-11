@@ -36,7 +36,7 @@ func (o *Order) ToInsertMap() map[string]interface{} {
 
 type OrderDetail struct {
 	OrderID       string
-	OrderDetailID string
+	OrderDetailID int64
 	ItemID        string
 	Price         int64
 	Quantity      int64

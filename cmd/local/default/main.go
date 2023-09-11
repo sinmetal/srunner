@@ -133,7 +133,7 @@ func runSamplePattern1(ctx context.Context, sc *spanner.Client) {
 					quantity := rand.Int63n(30) + 1
 					v := &stores1.OrderDetail{
 						OrderID:       orderID,
-						OrderDetailID: fmt.Sprintf("%03d", i+1),
+						OrderDetailID: int64(i + 1),
 						ItemID:        item.ItemID,
 						Price:         item.Price,
 						Quantity:      quantity,
@@ -190,7 +190,7 @@ func runSamplePattern2(ctx context.Context, sc *spanner.Client) {
 					v := &stores2.OrderDetail{
 						UserID:        userID,
 						OrderID:       orderID,
-						OrderDetailID: fmt.Sprintf("%03d", i+1),
+						OrderDetailID: int64(i + 1),
 						ItemID:        item.ItemID,
 						Price:         item.Price,
 						Quantity:      quantity,
