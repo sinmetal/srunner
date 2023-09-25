@@ -46,14 +46,11 @@ func NewProactiveCacheTokenSource(ts oauth2.TokenSource, cfg Config) (*Proactive
 }
 
 func (s *ProactiveCacheTokenSource) Token() (*oauth2.Token, error) {
-	fmt.Println("Start Token")
-
 	s.mu.RLock()
 	tk := s.t
 	s.mu.RUnlock()
 
 	if tk.Valid() {
-		fmt.Println("Token is Valid")
 		return tk, nil
 	}
 
