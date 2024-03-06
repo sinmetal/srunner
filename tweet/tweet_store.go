@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
+	"github.com/sinmetal/srunner/internal/trace"
 	"github.com/sinmetal/srunner/spanners"
-	"go.opencensus.io/trace"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 )
@@ -88,7 +89,7 @@ func (s *defaultTweetStore) TableName() string {
 
 // Insert is Insert to Tweet
 func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) (commitTimestamp time.Time, err error) {
-	ctx, span := startSpan(ctx, "insert")
+	ctx, span := trace.StartSpan(ctx, "tweetstore.Insert")
 	defer span.End()
 
 	in := tweet.ToInsertOrUpdateMap()
@@ -106,7 +107,7 @@ func (s *defaultTweetStore) Insert(ctx context.Context, tweet *Tweet) (commitTim
 }
 
 func (s *defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, error) {
-	ctx, span := startSpan(ctx, "get")
+	ctx, span := trace.StartSpan(ctx, "tweetstore.Get")
 	defer span.End()
 
 	row, err := s.sc.Single().ReadRowWithOptions(ctx, s.TableName(), key,
@@ -130,7 +131,7 @@ func (s *defaultTweetStore) Get(ctx context.Context, key spanner.Key) (*Tweet, e
 
 // Query is Tweet を sort_ascで取得する
 func (s *defaultTweetStore) Query(ctx context.Context, limit int) ([]*Tweet, error) {
-	ctx, span := startSpan(ctx, "query")
+	ctx, span := trace.StartSpan(ctx, "tweetstore.Query")
 	defer span.End()
 
 	iter := s.sc.Single().WithTimestampBound(spanner.MaxStaleness(2*time.Second)).
@@ -169,7 +170,7 @@ func (s *defaultTweetStore) Query(ctx context.Context, limit int) ([]*Tweet, err
 
 // QueryRandom is Query Statsを水増しするための適当なクエリを実行する
 func (s *defaultTweetStore) QueryRandom(ctx context.Context) error {
-	ctx, span := startSpan(ctx, "queryRandom")
+	ctx, span := trace.StartSpan(ctx, "tweetstore.QueryRandom")
 	defer span.End()
 
 	sql := fmt.Sprintf(`
@@ -208,7 +209,7 @@ JOIN User U ON IO.UserID = U.UserID
 }
 
 func (s *defaultTweetStore) QueryHeavy(ctx context.Context) ([]*Tweet, error) {
-	ctx, span := startSpan(ctx, "queryHeavy")
+	ctx, span := trace.StartSpan(ctx, "tweetstore.QueryHeavy")
 	defer span.End()
 
 	iter := s.sc.Single().QueryWithOptions(ctx, spanner.NewStatement("SELECT * FROM Tweet WHERE Content Like  '%Hoge%' LIMIT 100"),
@@ -241,7 +242,7 @@ func (s *defaultTweetStore) QueryHeavy(ctx context.Context) ([]*Tweet, error) {
 
 // QueryAll is 全件ひたすら取得して、件数を返す
 func (s *defaultTweetStore) QueryAll(ctx context.Context) (int, error) {
-	ctx, span := startSpan(ctx, "queryAll")
+	ctx, span := trace.StartSpan(ctx, "tweetstore.QueryAll")
 	defer span.End()
 
 	iter := s.sc.Single().WithTimestampBound(spanner.ReadTimestamp(time.Now())).
@@ -279,7 +280,7 @@ type TweetIDAndAuthor struct {
 
 // QueryResultStruct is StructをResultで返すQueryのサンプル
 func (s *defaultTweetStore) QueryResultStruct(ctx context.Context, orderByAsc bool, limit int, timestampBound *spanner.TimestampBound) ([]*TweetIDAndAuthor, error) {
-	ctx, span := startSpan(ctx, "queryResultStruct")
+	ctx, span := trace.StartSpan(ctx, "tweetstore.QueryResultStruct")
 	defer span.End()
 
 	sql := `
@@ -339,7 +340,7 @@ type PageOptionForQueryOrderByCreatedAtDesc struct {
 
 // QueryResultStruct is StructをResultで返すQueryのサンプル
 func (s *defaultTweetStore) QueryOrderByCreatedAtDesc(ctx context.Context, startShard int, endShard int, pageOption *PageOptionForQueryOrderByCreatedAtDesc, limit int) ([]*Tweet, error) {
-	ctx, span := startSpan(ctx, "queryOrderByCreatedAtDesc")
+	ctx, span := trace.StartSpan(ctx, "tweetstore.QueryOrderByCreatedAtDesc")
 	defer span.End()
 
 	sql := `
@@ -387,7 +388,7 @@ LIMIT @Limit
 }
 
 func (s *defaultTweetStore) Update(ctx context.Context, id string) (*spanner.CommitResponse, error) {
-	ctx, span := startSpan(ctx, "update")
+	ctx, span := trace.StartSpan(ctx, "tweetstore.Update")
 	defer span.End()
 
 	resp, err := s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
@@ -422,13 +423,13 @@ func (s *defaultTweetStore) Update(ctx context.Context, id string) (*spanner.Com
 	if err != nil {
 		return nil, fmt.Errorf("failed TweetStore.Update : %w", err)
 	}
-	span.AddAttributes(trace.Int64Attribute("mutation-count", resp.CommitStats.GetMutationCount()))
+	span.SetAttributes(attribute.Int64("mutation-count", resp.CommitStats.GetMutationCount()))
 
 	return &resp, nil
 }
 
 func (s *defaultTweetStore) UpdateDML(ctx context.Context, id string) (time.Time, error) {
-	ctx, span := startSpan(ctx, "updateDML")
+	ctx, span := trace.StartSpan(ctx, "tweetstore.UpdateDML")
 	defer span.End()
 
 	resp, err := s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
@@ -455,7 +456,7 @@ func (s *defaultTweetStore) UpdateDML(ctx context.Context, id string) (time.Time
 
 // Delete is 指定した ID の Row を削除する
 func (s *defaultTweetStore) Delete(ctx context.Context, id string) error {
-	ctx, span := startSpan(ctx, "delete")
+	ctx, span := trace.StartSpan(ctx, "tweetstore.Delete")
 	defer span.End()
 
 	_, err := s.sc.Apply(ctx, []*spanner.Mutation{spanner.Delete(s.TableName(), spanner.Key{id})}, spanners.AppTransactionTagApplyOption())
