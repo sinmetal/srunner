@@ -10,7 +10,7 @@ import (
 	mexporter "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
 	texporter "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	gcppropagator "github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator"
-	metadatabox "github.com/sinmetalcraft/gcpbox/metadata/cloudrun"
+	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 	"go.opentelemetry.io/contrib/detectors/gcp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -29,7 +29,7 @@ func init() {
 	ctx := context.Background()
 	fmt.Println("trace init()")
 
-	if metadatabox.OnCloudRun() {
+	if metadatabox.OnGCP() {
 		installPropagators()
 
 		projectID, err := metadatabox.ProjectID()
