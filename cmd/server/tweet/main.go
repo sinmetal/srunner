@@ -75,6 +75,7 @@ func main() {
 				if err != nil {
 					log.Printf("failed TweetStore.Insert() id=%s err=%s\n", id, err)
 				}
+				time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond) // Insert頻度を少し抑えつつ、ランダム要素を加える
 			}
 		}
 	}(ctx)
