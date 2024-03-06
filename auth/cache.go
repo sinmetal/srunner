@@ -46,22 +46,17 @@ func NewProactiveCacheTokenSource(ts oauth2.TokenSource, cfg Config) (*Proactive
 }
 
 func (s *ProactiveCacheTokenSource) Token() (*oauth2.Token, error) {
-	fmt.Println("Start Token")
-
 	s.mu.RLock()
 	tk := s.t
 	s.mu.RUnlock()
 
 	if tk.Valid() {
-		fmt.Println("Token is Valid")
 		return tk, nil
 	}
 
-	fmt.Println("Token is Invalid")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	fmt.Println("Create New Token")
 	t, err := s.new.Token()
 	if err != nil {
 		return nil, fmt.Errorf("failed oauth2 new.Token() : %w", err)
@@ -86,7 +81,6 @@ func (s *ProactiveCacheTokenSource) Run(ctx context.Context) {
 		case <-retrych:
 		}
 
-		fmt.Println("Create New Token for Cache")
 		token, err := s.new.Token()
 		if err != nil {
 			fmt.Printf("failed oauth2.new.Token(). retry wait %s err=%s\n", wait, err)
@@ -104,7 +98,6 @@ func (s *ProactiveCacheTokenSource) Run(ctx context.Context) {
 		}
 
 		s.mu.Lock()
-		fmt.Println("Cache Token")
 		s.t = token
 		s.mu.Unlock()
 		wait = s.initialWait
