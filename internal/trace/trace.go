@@ -67,6 +67,7 @@ func init() {
 		// meterProvider = getOtlpMeterProvider(ctx, res)
 		fmt.Println("not set meterProvider")
 	}
+	fmt.Printf("IsOpenTelemetryMetricsEnabled=%t\n", spanner.IsOpenTelemetryMetricsEnabled())
 }
 
 func installPropagators() {
