@@ -42,7 +42,11 @@ func main() {
 		panic(err)
 	}
 
-	sc, err := spanner.NewClient(ctx, dbName, option.WithTokenSource(tokenSource))
+	// meterProvider := trace.GetMeterProvider() // otel.SetMeterProviderでglobalにセットしている
+	sc, err := spanner.NewClientWithConfig(ctx, dbName,
+		spanner.ClientConfig{},
+		option.WithTokenSource(tokenSource),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -75,6 +79,7 @@ func main() {
 				if err != nil {
 					log.Printf("failed TweetStore.Insert() id=%s err=%s\n", id, err)
 				}
+				time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond) // Insert頻度を少し抑えつつ、ランダム要素を加える
 			}
 		}
 	}(ctx)
