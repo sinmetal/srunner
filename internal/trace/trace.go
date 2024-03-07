@@ -58,6 +58,7 @@ func init() {
 		if err != nil {
 			log.Fatalf("getOtlpMeterProvider: %v", err)
 		}
+		otel.SetMeterProvider(meterProvider)
 	}
 	if tracer == nil {
 		fmt.Println("set default otel tracer")
