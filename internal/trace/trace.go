@@ -25,8 +25,7 @@ import (
 var tracer trace.Tracer
 var meterProvider *sdkmetric.MeterProvider
 
-func init() {
-	ctx := context.Background()
+func Init(ctx context.Context, serviceName string, revision string) {
 	fmt.Println("trace init()")
 
 	if metadatabox.OnGCP() {
@@ -39,7 +38,7 @@ func init() {
 
 		spanner.EnableOpenTelemetryMetrics()
 
-		res, err := newResource(ctx, "", "")
+		res, err := newResource(ctx, serviceName, revision)
 		if errors.Is(err, resource.ErrPartialResource) || errors.Is(err, resource.ErrSchemaURLConflict) {
 			log.Println(err)
 		} else if err != nil {
@@ -125,8 +124,8 @@ func newResource(ctx context.Context, serviceName string, revision string) (*res
 		resource.WithTelemetrySDK(),
 		// Add your own custom attributes to identify your application
 		resource.WithAttributes(
-			semconv.ServiceNameKey.String("srunner"),
-			semconv.ServiceVersion("0.0.0"),
+			semconv.ServiceNameKey.String(serviceName),
+			semconv.ServiceVersion(revision),
 		),
 	)
 }

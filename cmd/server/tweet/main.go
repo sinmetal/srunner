@@ -13,6 +13,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"github.com/sinmetal/srunner/auth"
+	"github.com/sinmetal/srunner/internal/trace"
 	"github.com/sinmetal/srunner/randdata"
 	"github.com/sinmetal/srunner/tweet"
 	"google.golang.org/api/option"
@@ -41,6 +42,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	var serviceName = "srunner"
+	configServiceName := os.Getenv("SRUNNER_SERVICE_NAME")
+	if configServiceName != "" {
+		serviceName = configServiceName
+	}
+	fmt.Printf("SRUNNER_SERVICE_NAME=%s\n", serviceName)
+
+	trace.Init(ctx, serviceName, "v0.0.0")
 
 	// meterProvider := trace.GetMeterProvider() // otel.SetMeterProviderでglobalにセットしている
 	sc, err := spanner.NewClientWithConfig(ctx, dbName,
