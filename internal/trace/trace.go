@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 
 	"cloud.google.com/go/spanner"
 	mexporter "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
@@ -28,7 +29,8 @@ var meterProvider *sdkmetric.MeterProvider
 func Init(ctx context.Context, serviceName string, revision string) {
 	fmt.Println("trace init()")
 
-	if metadatabox.OnGCP() {
+	// TODO Cloud Buildの時は動かないようにしているが、もうちょっといい方法が欲しいな
+	if metadatabox.OnGCP() && os.Getenv("REF_NAME") == "" {
 		installPropagators()
 
 		projectID, err := metadatabox.ProjectID()
