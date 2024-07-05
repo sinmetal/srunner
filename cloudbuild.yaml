@@ -13,16 +13,6 @@ steps:
   entrypoint: 'go'
   args: ['build', '-o', 'app', 'github.com/sinmetal/srunner/cmd/server/tweet']
   env: ['CGO_ENABLED=0']
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '--tag=gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA', '.']
-- name: 'gcr.io/cloud-builders/kubectl'
-  args:
-    - set
-    - image
-    - deployment/srunner-dep
-    - srunner-dep=gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA
-    - --namespace=metalapps
-  env:
-    - 'CLOUDSDK_COMPUTE_REGION=asia-northeast1'
-    - 'CLOUDSDK_CONTAINER_CLUSTER=cluster1'
-images: ['gcr.io/$PROJECT_ID/sinmetal/srunner/$BRANCH_NAME:$COMMIT_SHA']
+images:
+  - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/sinmetal/srunner:$COMMIT_SHA'
+  - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/sinmetal/srunner:$BRANCH_NAME'
