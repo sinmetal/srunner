@@ -7,13 +7,10 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
-	sapiv1 "cloud.google.com/go/spanner/apiv1"
 	"github.com/google/uuid"
-	"github.com/googleapis/gax-go/v2"
 	"github.com/sinmetal/srunner/spanners"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
-	spannerpb "google.golang.org/genproto/googleapis/spanner/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -124,43 +121,6 @@ func requestToSpanner(ctx context.Context, t *testing.T, sc *spanner.Client) {
 			t.Fatal(err)
 		}
 	}
-}
-
-func TestSpannerAPIV1(t *testing.T) {
-	ctx := context.Background()
-
-	sc, err := sapiv1.NewClient(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	session, err := sc.CreateSession(ctx, &spannerpb.CreateSessionRequest{
-		Database: gcpugPublicSpannerDB,
-		Session:  nil,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	req := &spannerpb.ExecuteSqlRequest{
-		Session:        session.GetName(),
-		Transaction:    nil,
-		Sql:            "SELECT 1",
-		Params:         nil,
-		ParamTypes:     nil,
-		ResumeToken:    nil,
-		QueryMode:      0,
-		PartitionToken: nil,
-		Seqno:          0,
-		QueryOptions:   nil,
-	}
-	var md metadata.MD
-	_, err = sc.ExecuteSql(ctx, req, gax.WithGRPCOptions(grpc.Header(&md)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	srvTiming := md.Get("server-timing")
-	t.Log(srvTiming)
 }
 
 func TestExtractServerTimingValue(t *testing.T) {
