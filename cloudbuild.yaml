@@ -1,8 +1,11 @@
 steps:
-- name: 'golang:1.21-bullseye'
+- name: 'golang:1.22-bullseye'
   entrypoint: 'go'
   args: ['build', '-o', 'app', 'github.com/sinmetal/srunner/cmd/server/tweet']
   env: ['CGO_ENABLED=0']
-images:
-  - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/sinmetal/srunner:$COMMIT_SHA'
-  - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/sinmetal/srunner:$BRANCH_NAME'
+- name: 'gcr.io/kaniko-project/executor:v1.22.0'
+  args:
+    - --destination=asia-northeast1-docker.pkg.dev/$PROJECT_ID/srunner/main:$BRANCH_NAME
+    - --destination=asia-northeast1-docker.pkg.dev/$PROJECT_ID/srunner/main:$COMMIT_SHA
+    - --cache=true
+    - --cache-ttl=6h
