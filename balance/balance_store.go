@@ -5,9 +5,12 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
-	"github.com/google/uuid"
 	"github.com/sinmetal/srunner/spanners"
 	"google.golang.org/grpc/codes"
+)
+
+const (
+	UserAccountIDMax = 1000000
 )
 
 type Store struct {
@@ -20,6 +23,15 @@ func NewStore(ctx context.Context, sc *spanner.Client) (*Store, error) {
 	}, nil
 }
 
+type UserAccount struct {
+	UserID    string
+	Age       int64
+	Height    int64
+	Weight    int64
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type UserBalance struct {
 	UserID    string
 	Amount    int64
@@ -29,11 +41,16 @@ type UserBalance struct {
 }
 
 type UserDepositHistory struct {
-	DepositID string
-	UserID    string
-	Amount    int64
-	Point     int64
-	CreatedAt time.Time
+	UserID      string
+	DepositID   string
+	DepositType DepositType
+	Amount      int64
+	Point       int64
+	CreatedAt   time.Time
+}
+
+func (s *Store) UserAccountTable() string {
+	return "UserAccount"
 }
 
 func (s *Store) UserBalanceTable() string {
@@ -44,14 +61,35 @@ func (s *Store) UserDepositHistoryTable() string {
 	return "UserDepositHistory"
 }
 
-func (s *Store) Deposit(ctx context.Context, userID string, amount int64, point int64) (userBalance *UserBalance, userDepositHistories *UserDepositHistory, err error) {
-	ub := &UserBalance{}
+func (s *Store) CreateUserAccount(ctx context.Context, userAccount *UserAccount) (resultUserAccount *UserAccount, err error) {
+	userAccount.CreatedAt = spanner.CommitTimestamp
+	userAccount.UpdatedAt = spanner.CommitTimestamp
+	commitTime, err := s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
+		m, err := spanner.InsertStruct(s.UserAccountTable(), userAccount)
+		if err != nil {
+			return err
+		}
+		if err := tx.BufferWrite([]*spanner.Mutation{m}); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	userAccount.CreatedAt = commitTime
+	userAccount.UpdatedAt = commitTime
+	return userAccount, nil
+}
+
+func (s *Store) Deposit(ctx context.Context, userID string, depositID string, depositType DepositType, amount int64, point int64) (userBalance *UserBalance, userDepositHistories *UserDepositHistory, err error) {
+	var ub *UserBalance
 	var udh *UserDepositHistory
 	resp, err := s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
 		var mus []*spanner.Mutation
 		row, err := tx.ReadRowWithOptions(ctx, s.UserBalanceTable(),
 			spanner.Key{userID},
-			[]string{"UserID", "Amount", "Point", "CreatedAt", "UpdatedAt"},
+			[]string{"UserID", "DepositType", "Amount", "Point", "CreatedAt", "UpdatedAt"},
 			&spanner.ReadOptions{
 				RequestTag: spanners.AppTag(),
 			})
@@ -79,11 +117,12 @@ func (s *Store) Deposit(ctx context.Context, userID string, amount int64, point 
 		mus = append(mus, ubMu)
 
 		udh = &UserDepositHistory{
-			DepositID: uuid.New().String(),
-			UserID:    userID,
-			Amount:    amount,
-			Point:     point,
-			CreatedAt: spanner.CommitTimestamp,
+			UserID:      userID,
+			DepositID:   depositID,
+			DepositType: depositType,
+			Amount:      amount,
+			Point:       point,
+			CreatedAt:   spanner.CommitTimestamp,
 		}
 		udhMu, err := spanner.InsertStruct(s.UserDepositHistoryTable(), udh)
 		if err != nil {
