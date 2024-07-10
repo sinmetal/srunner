@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	"cloud.google.com/go/spanner"
@@ -11,15 +12,14 @@ import (
 	texporter "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	gcppropagator "github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator"
 	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
-	"go.opentelemetry.io/contrib/exporters/autoexport"
-	"go.opentelemetry.io/contrib/propagators/autoprop"
+	"go.opentelemetry.io/contrib/detectors/gcp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/api/option"
 )
@@ -32,10 +32,35 @@ func Init(ctx context.Context, serviceName string, revision string) {
 
 	// TODO Cloud Buildの時は動かないようにしているが、もうちょっといい方法が欲しいな
 	if metadatabox.OnGCP() && os.Getenv("REF_NAME") == "" {
-		_, err := setupOpenTelemetry(ctx)
+		installPropagators()
+
+		projectID, err := metadatabox.ProjectID()
 		if err != nil {
-			panic(err)
+			log.Fatalf("required google cloud project id: %v", err)
 		}
+
+		spanner.EnableOpenTelemetryMetrics()
+
+		res, err := newResource(ctx, serviceName, revision)
+		if errors.Is(err, resource.ErrPartialResource) || errors.Is(err, resource.ErrSchemaURLConflict) {
+			log.Println(err)
+		} else if err != nil {
+			log.Fatalf("resource.New: %v", err)
+		}
+		tp, err := getOtlpTracerProvider(ctx, projectID, res)
+		if err != nil {
+			log.Fatalf("getOtlpTracerProvider: %v", err)
+		}
+		// TODO Shutdownはどうやろう？ defer tp.Shutdown(ctx) // flushes any pending spans, and closes connections.
+		otel.SetTracerProvider(tp)
+		tracer = otel.GetTracerProvider().Tracer("github.com/sinmetal/srunner")
+
+		// Create a new meter provider
+		meterProvider, err = getOtlpMeterProvider(ctx, projectID, res)
+		if err != nil {
+			log.Fatalf("getOtlpMeterProvider: %v", err)
+		}
+		otel.SetMeterProvider(meterProvider)
 	}
 	if tracer == nil {
 		fmt.Println("set default otel tracer")
@@ -46,51 +71,6 @@ func Init(ctx context.Context, serviceName string, revision string) {
 		fmt.Println("not set meterProvider")
 	}
 	fmt.Printf("IsOpenTelemetryMetricsEnabled=%t\n", spanner.IsOpenTelemetryMetricsEnabled())
-}
-
-func setupOpenTelemetry(ctx context.Context) (shutdown func(context.Context) error, err error) {
-	var shutdownFuncs []func(context.Context) error
-
-	// shutdown combines shutdown functions from multiple OpenTelemetry
-	// components into a single function.
-	shutdown = func(ctx context.Context) error {
-		var err error
-		for _, fn := range shutdownFuncs {
-			err = errors.Join(err, fn(ctx))
-		}
-		shutdownFuncs = nil
-		return err
-	}
-
-	// Configure Context Propagation to use the default W3C traceparent format
-	otel.SetTextMapPropagator(autoprop.NewTextMapPropagator())
-
-	// Configure Trace Export to send spans as OTLP
-	spanExporter, err := autoexport.NewSpanExporter(ctx)
-	if err != nil {
-		err = errors.Join(err, shutdown(ctx))
-		return
-	}
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(spanExporter),
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-	)
-	shutdownFuncs = append(shutdownFuncs, tp.Shutdown)
-	otel.SetTracerProvider(tp)
-
-	// Configure Metric Export to send metrics as OTLP
-	mreader, err := autoexport.NewMetricReader(ctx)
-	if err != nil {
-		err = errors.Join(err, shutdown(ctx))
-		return
-	}
-	mp := metric.NewMeterProvider(
-		metric.WithReader(mreader),
-	)
-	shutdownFuncs = append(shutdownFuncs, mp.Shutdown)
-	otel.SetMeterProvider(mp)
-
-	return shutdown, nil
 }
 
 func installPropagators() {
@@ -137,6 +117,20 @@ func getOtlpTracerProvider(ctx context.Context, projectID string, res *resource.
 	)
 
 	return tracerProvider, nil
+}
+
+func newResource(ctx context.Context, serviceName string, revision string) (*resource.Resource, error) {
+	return resource.New(ctx,
+		// Use the GCP resource detector to detect information about the GCP platform
+		resource.WithDetectors(gcp.NewDetector()),
+		// Keep the default detectors
+		resource.WithTelemetrySDK(),
+		// Add your own custom attributes to identify your application
+		resource.WithAttributes(
+			semconv.ServiceNameKey.String(serviceName),
+			semconv.ServiceVersion(revision),
+		),
+	)
 }
 
 func StartSpan(ctx context.Context, spanName string, ops ...trace.SpanStartOption) (context.Context, trace.Span) {
