@@ -14,6 +14,7 @@ import (
 	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 	"go.opentelemetry.io/contrib/detectors/gcp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -138,7 +139,10 @@ func StartSpan(ctx context.Context, spanName string, ops ...trace.SpanStartOptio
 
 func EndSpan(ctx context.Context, err error) {
 	span := trace.SpanFromContext(ctx)
-	span.RecordError(err)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		span.RecordError(err)
+	}
 	span.End()
 }
 
