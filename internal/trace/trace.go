@@ -136,6 +136,12 @@ func StartSpan(ctx context.Context, spanName string, ops ...trace.SpanStartOptio
 	return tracer.Start(ctx, spanName, ops...)
 }
 
+func EndSpan(ctx context.Context, err error) {
+	span := trace.SpanFromContext(ctx)
+	span.RecordError(err)
+	span.End()
+}
+
 func GetMeterProvider() *sdkmetric.MeterProvider {
 	return meterProvider
 }
