@@ -10,7 +10,6 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.24.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.48.0
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/gax-go/v2 v2.12.5
 	github.com/pkg/errors v0.9.1
 	github.com/sinmetalcraft/gcpbox v1.24.0
 	go.opencensus.io v0.24.0
@@ -51,6 +50,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
+	github.com/googleapis/gax-go/v2 v2.12.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/prometheus/prometheus v0.53.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.52.0 // indirect
