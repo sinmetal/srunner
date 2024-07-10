@@ -7,23 +7,23 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
-	"github.com/sinmetal/srunner/auth"
+	"github.com/sinmetal/srunner/balance"
 	"github.com/sinmetal/srunner/internal/trace"
 	"github.com/sinmetal/srunner/randdata"
 	"github.com/sinmetal/srunner/tweet"
-	"google.golang.org/api/option"
 )
 
-var shutdownChan = make(chan bool)
-var signalChan chan (os.Signal) = make(chan os.Signal, 1)
+var signalChan = make(chan os.Signal, 1)
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	fmt.Println("Ignition srunner")
 
@@ -38,11 +38,6 @@ func main() {
 	dbName := fmt.Sprintf("projects/%s/instances/%s/databases/%s", spannerProjectID, spannerInstanceID, spannerDatabaseID)
 	fmt.Println(dbName)
 
-	tokenSource, err := auth.DefaultTokenSourceWithProactiveCache(ctx)
-	if err != nil {
-		panic(err)
-	}
-
 	var serviceName = "srunner"
 	configServiceName := os.Getenv("SRUNNER_SERVICE_NAME")
 	if configServiceName != "" {
@@ -50,56 +45,140 @@ func main() {
 	}
 	fmt.Printf("SRUNNER_SERVICE_NAME=%s\n", serviceName)
 
+	runner := runner()
+
 	trace.Init(ctx, serviceName, "v0.0.0")
 
 	// meterProvider := trace.GetMeterProvider() // otel.SetMeterProviderでglobalにセットしている
-	sc, err := spanner.NewClientWithConfig(ctx, dbName,
-		spanner.ClientConfig{},
-		option.WithTokenSource(tokenSource),
-	)
+	sc, err := spanner.NewClient(ctx, dbName)
 	if err != nil {
 		panic(err)
 	}
 
-	ts := tweet.NewStore(sc)
-
-	go func(ctx context.Context) {
-		for {
-			select {
-			case <-shutdownChan:
-				fmt.Println("stop logic")
-				sc.Close()
-				return
-			default:
-				id := uuid.New().String()
-				now := time.Now()
-				author := randdata.GetAuthor()
-				favos := randdata.GetAuthors()
-				_, err := ts.Insert(ctx, &tweet.Tweet{
-					TweetID:       id,
-					Author:        author,
-					Content:       fmt.Sprintf("Hello. My name is %s. %s (%s*%s*%s)", author, now, uuid.New().String(), uuid.New().String(), uuid.New().String()),
-					Favos:         favos,
-					Sort:          rand.Int63(),
-					CreatedAt:     now,
-					UpdatedAt:     now,
-					CommitedAt:    spanner.CommitTimestamp,
-					SchemaVersion: 1,
-				})
-				if err != nil {
-					log.Printf("failed TweetStore.Insert() id=%s err=%s\n", id, err)
-				}
-				time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond) // Insert頻度を少し抑えつつ、ランダム要素を加える
-			}
+	balanceStore, err := balance.NewStore(ctx, sc)
+	if err != nil {
+		panic(err)
+	}
+	if ok := runner["CREATE_USER_ACCOUNT"]; ok {
+		if err := runCreateUserAccount(ctx, balanceStore, 1, balance.UserAccountIDMax); err != nil {
+			panic(err)
 		}
-	}(ctx)
+	}
+	if ok := runner["DEPOSIT"]; ok {
+		go runBalanceDeposit(ctx, balanceStore)
+	}
+	if ok := runner["TWEET"]; ok {
+		ts := tweet.NewStore(sc)
+		go runTweet(ctx, ts)
+	}
 
 	// Receive output from signalChan.
 	sig := <-signalChan
-	fmt.Printf("%s signal caught", sig)
-
-	time.Sleep(10 * time.Second)
-	shutdownChan <- true
-
+	fmt.Printf("--%s signal caught--\n", sig)
+	cancel()
+	time.Sleep(10)
+	sc.Close()
 	fmt.Println("Shutdown srunner")
+}
+
+func runner() map[string]bool {
+	runner := make(map[string]bool)
+	runnersParam := os.Getenv("SRUNNER_RUNNERS")
+	runners := strings.Split(runnersParam, ",")
+	for _, v := range runners {
+		runner[v] = true
+	}
+	return runner
+}
+
+func runTweet(ctx context.Context, ts tweet.Store) {
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("stop run tweet")
+			return
+		default:
+			id := uuid.New().String()
+			now := time.Now()
+			author := randdata.GetAuthor()
+			favos := randdata.GetAuthors()
+			_, err := ts.Insert(ctx, &tweet.Tweet{
+				TweetID:       id,
+				Author:        author,
+				Content:       fmt.Sprintf("Hello. My name is %s. %s (%s*%s*%s)", author, now, uuid.New().String(), uuid.New().String(), uuid.New().String()),
+				Favos:         favos,
+				Sort:          rand.Int63(),
+				CreatedAt:     now,
+				UpdatedAt:     now,
+				CommitedAt:    spanner.CommitTimestamp,
+				SchemaVersion: 1,
+			})
+			if err != nil {
+				log.Printf("failed TweetStore.Insert() id=%s err=%s\n", id, err)
+			}
+			time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond) // Insert頻度を少し抑えつつ、ランダム要素を加える
+		}
+	}
+}
+
+func runCreateUserAccount(ctx context.Context, bs *balance.Store, idRangeStart, idRangeEnd int64) error {
+	fmt.Println("start runCreateUserAccount")
+
+	for i := idRangeStart; i <= idRangeEnd; i++ {
+		userID := balance.CreateUserID(ctx, i)
+		_, err := bs.CreateUserAccount(ctx, &balance.UserAccount{
+			UserID: userID,
+			Age:    int64(rand.Intn(100)),
+			Height: int64(50 + rand.Intn(150)),
+			Weight: int64(30 + rand.Intn(100)),
+		})
+		if err != nil {
+			return fmt.Errorf("failed balance.CreateUserAccount idRange=%d-%d; userID=%s : %w", idRangeStart, idRangeEnd, userID, err)
+		}
+	}
+	return nil
+}
+
+func runBalanceDeposit(ctx context.Context, bs *balance.Store) {
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("stop run balance.Deposit")
+			return
+		default:
+			userAccountID := balance.RandomUserID(ctx)
+			depositID := balance.CreateDepositID(ctx)
+			var amount int64
+			var point int64
+			depositType := balance.RandomDepositType(ctx)
+			switch depositType {
+			case balance.DepositTypeBank:
+				switch rand.Intn(5) {
+				case 1:
+					amount = 10000
+				case 2:
+					amount = 20000
+				case 3:
+					amount = 30000
+				default:
+					amount = int64(1000 + rand.Intn(200000))
+				}
+			case balance.DepositTypeCampaignPoint:
+				point = int64(10 + rand.Intn(1000))
+			case balance.DepositTypeRefund:
+				amount = int64(10 + rand.Intn(1000))
+			case balance.DepositTypeSales:
+				amount = int64(500 + rand.Intn(10000))
+				point = int64(500 + rand.Intn(10000))
+			default:
+				fmt.Println("unsupported DepositType")
+				continue
+			}
+			_, _, err := bs.Deposit(ctx, userAccountID, depositID, depositType, amount, point)
+			if err != nil {
+				fmt.Printf("failed balance.Depoist err=%s\n", err)
+				time.Sleep(time.Duration(10+rand.Intn(600)) * time.Second)
+			}
+		}
+	}
 }

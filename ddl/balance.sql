@@ -1,3 +1,24 @@
+CREATE TABLE UserAccount (
+    UserID STRING(MAX) NOT NULL,
+    Age INT64,
+    Height INT64,
+    Weight INT64,
+    CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
+    UpdatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
+) PRIMARY KEY (UserID);
+
+CREATE INDEX AgeAndHeightByUserAccount
+ON UserAccount (
+    Age,
+    Height
+);
+
+CREATE INDEX AgeAndWeightByUserAccount
+ON UserAccount (
+    Age,
+    Weight
+);
+
 CREATE TABLE UserBalance (
 	UserID STRING(MAX) NOT NULL,
 	Amount INT64 NOT NULL,
@@ -7,21 +28,22 @@ CREATE TABLE UserBalance (
 ) PRIMARY KEY (UserID);
 
 CREATE TABLE UserDepositHistory (
-	DepositID STRING(MAX) NOT NULL,
-	UserID STRING(MAX) NOT NULL,
+    UserID STRING(MAX) NOT NULL,
+    DepositID STRING(MAX) NOT NULL,
+    DepositType int64 NOT NULL,
 	Amount INT64 NOT NULL,
 	Point INT64 NOT NULL,
 	CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
-) PRIMARY KEY (DepositID);
+) PRIMARY KEY (UserID, DepositID);
 
-CREATE INDEX UserIDByUserDepositHistory
+CREATE INDEX DepositTypeByUserDepositHistory
 ON UserDepositHistory (
-	UserID
+    DepositType
 );
 
-CREATE INDEX UserIDStoredAmountAndPointByUserDepositHistory
+CREATE INDEX DepositTypeStoredAmountAndPointByUserDepositHistory
 ON UserDepositHistory (
-	UserID
+    DepositType
 ) STORING (
 	Amount,
 	Point
