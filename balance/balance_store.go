@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
+	"github.com/sinmetal/srunner/internal/trace"
 	"github.com/sinmetal/srunner/spanners"
 	"google.golang.org/grpc/codes"
 )
@@ -97,6 +98,9 @@ func (s *Store) CreateUserAccount(ctx context.Context, userAccount *UserAccount)
 }
 
 func (s *Store) Deposit(ctx context.Context, userID string, depositID string, depositType DepositType, amount int64, point int64) (userBalance *UserBalance, userDepositHistories *UserDepositHistory, err error) {
+	ctx, _ = trace.StartSpan(ctx, "BalanceStore.Deposit")
+	defer trace.EndSpan(ctx, err)
+
 	var ub *UserBalance
 	var udh *UserDepositHistory
 	resp, err := s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
