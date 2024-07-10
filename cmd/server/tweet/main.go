@@ -45,14 +45,12 @@ func main() {
 	}
 	fmt.Printf("SRUNNER_SERVICE_NAME=%s\n", serviceName)
 
-	runner := runnner()
+	runner := runner()
 
 	trace.Init(ctx, serviceName, "v0.0.0")
 
 	// meterProvider := trace.GetMeterProvider() // otel.SetMeterProviderでglobalにセットしている
-	sc, err := spanner.NewClientWithConfig(ctx, dbName,
-		spanner.ClientConfig{},
-	)
+	sc, err := spanner.NewClient(ctx, dbName)
 	if err != nil {
 		panic(err)
 	}
@@ -66,6 +64,9 @@ func main() {
 			panic(err)
 		}
 	}
+	if ok := runner["DEPOSIT"]; ok {
+		go runBalanceDeposit(ctx, balanceStore)
+	}
 	if ok := runner["TWEET"]; ok {
 		ts := tweet.NewStore(sc)
 		go runTweet(ctx, ts)
@@ -73,14 +74,14 @@ func main() {
 
 	// Receive output from signalChan.
 	sig := <-signalChan
-	fmt.Printf("%s signal caught", sig)
+	fmt.Printf("--%s signal caught--\n", sig)
 	cancel()
 	time.Sleep(10)
 	sc.Close()
 	fmt.Println("Shutdown srunner")
 }
 
-func runnner() map[string]bool {
+func runner() map[string]bool {
 	runner := make(map[string]bool)
 	runnersParam := os.Getenv("SRUNNER_RUNNERS")
 	runners := strings.Split(runnersParam, ",")
@@ -124,7 +125,7 @@ func runCreateUserAccount(ctx context.Context, bs *balance.Store, idRangeStart, 
 	fmt.Println("start runCreateUserAccount")
 
 	for i := idRangeStart; i <= idRangeEnd; i++ {
-		userID := fmt.Sprintf("u%010d", i)
+		userID := balance.CreateUserID(ctx, i)
 		_, err := bs.CreateUserAccount(ctx, &balance.UserAccount{
 			UserID: userID,
 			Age:    int64(rand.Intn(100)),
@@ -136,4 +137,48 @@ func runCreateUserAccount(ctx context.Context, bs *balance.Store, idRangeStart, 
 		}
 	}
 	return nil
+}
+
+func runBalanceDeposit(ctx context.Context, bs *balance.Store) {
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("stop run balance.Deposit")
+			return
+		default:
+			userAccountID := balance.RandomUserID(ctx)
+			depositID := balance.CreateDepositID(ctx)
+			var amount int64
+			var point int64
+			depositType := balance.RandomDepositType(ctx)
+			switch depositType {
+			case balance.DepositTypeBank:
+				switch rand.Intn(5) {
+				case 1:
+					amount = 10000
+				case 2:
+					amount = 20000
+				case 3:
+					amount = 30000
+				default:
+					amount = int64(1000 + rand.Intn(200000))
+				}
+			case balance.DepositTypeCampaignPoint:
+				point = int64(10 + rand.Intn(1000))
+			case balance.DepositTypeRefund:
+				amount = int64(10 + rand.Intn(1000))
+			case balance.DepositTypeSales:
+				amount = int64(500 + rand.Intn(10000))
+				point = int64(500 + rand.Intn(10000))
+			default:
+				fmt.Println("unsupported DepositType")
+				continue
+			}
+			_, _, err := bs.Deposit(ctx, userAccountID, depositID, depositType, amount, point)
+			if err != nil {
+				fmt.Printf("failed balance.Depoist err=%s\n", err)
+				time.Sleep(time.Duration(10+rand.Intn(600)) * time.Second)
+			}
+		}
+	}
 }

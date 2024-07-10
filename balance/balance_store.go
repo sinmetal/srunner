@@ -2,9 +2,12 @@ package balance
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"time"
 
 	"cloud.google.com/go/spanner"
+	"github.com/google/uuid"
 	"github.com/sinmetal/srunner/spanners"
 	"google.golang.org/grpc/codes"
 )
@@ -49,6 +52,17 @@ type UserDepositHistory struct {
 	CreatedAt   time.Time
 }
 
+func (v *UserDepositHistory) ToMutationMap() map[string]interface{} {
+	m := make(map[string]interface{})
+	m["UserID"] = v.UserID
+	m["DepositID"] = v.DepositID
+	m["DepositType"] = v.DepositType.ToIntn()
+	m["Amount"] = v.Amount
+	m["Point"] = v.Point
+	m["CreatedAt"] = v.CreatedAt
+	return m
+}
+
 func (s *Store) UserAccountTable() string {
 	return "UserAccount"
 }
@@ -89,7 +103,7 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 		var mus []*spanner.Mutation
 		row, err := tx.ReadRowWithOptions(ctx, s.UserBalanceTable(),
 			spanner.Key{userID},
-			[]string{"UserID", "DepositType", "Amount", "Point", "CreatedAt", "UpdatedAt"},
+			[]string{"UserID", "Amount", "Point", "CreatedAt", "UpdatedAt"},
 			&spanner.ReadOptions{
 				RequestTag: spanners.AppTag(),
 			})
@@ -101,10 +115,10 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 				CreatedAt: spanner.CommitTimestamp,
 			}
 		} else if err != nil {
-			return err
+			return fmt.Errorf("failed read UserBalance : %w", err)
 		} else {
 			if err := row.ToStruct(ub); err != nil {
-				return err
+				return fmt.Errorf("failed spanner.Row.ToStruct to UserBalance : %w", err)
 			}
 			ub.Amount += amount
 			ub.Point += point
@@ -112,7 +126,7 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 		ub.UpdatedAt = spanner.CommitTimestamp
 		ubMu, err := spanner.InsertOrUpdateStruct(s.UserBalanceTable(), ub)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed spanner.InsertOrUpdateStruct from UserBalance : %w", err)
 		}
 		mus = append(mus, ubMu)
 
@@ -124,14 +138,11 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 			Point:       point,
 			CreatedAt:   spanner.CommitTimestamp,
 		}
-		udhMu, err := spanner.InsertStruct(s.UserDepositHistoryTable(), udh)
-		if err != nil {
-			return err
-		}
+		udhMu := spanner.InsertMap(s.UserDepositHistoryTable(), udh.ToMutationMap())
 		mus = append(mus, udhMu)
 
 		if err := tx.BufferWrite(mus); err != nil {
-			return err
+			return fmt.Errorf("failed tx.BufferWrite : %w", err)
 		}
 		return nil
 	}, spanner.TransactionOptions{
@@ -144,4 +155,34 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 	udh.CreatedAt = resp.CommitTs
 
 	return ub, udh, nil
+}
+
+func CreateUserID(ctx context.Context, id int64) string {
+	return fmt.Sprintf("u%010d", id)
+}
+
+func RandomUserID(ctx context.Context) string {
+	v := rand.Int63n(UserAccountIDMax)
+	if v == 0 {
+		return CreateUserID(ctx, 1)
+	}
+	return CreateUserID(ctx, v)
+}
+
+func CreateDepositID(ctx context.Context) string {
+	return fmt.Sprintf("Deposit:%s", uuid.New().String())
+}
+
+func RandomDepositType(ctx context.Context) DepositType {
+	i := rand.Intn(10)
+	switch {
+	case i == 8:
+		return DepositTypeCampaignPoint
+	case i == 5:
+		return DepositTypeRefund
+	case i == 4:
+		return DepositTypeSales
+	default:
+		return DepositTypeBank
+	}
 }
