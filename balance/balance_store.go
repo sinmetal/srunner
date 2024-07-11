@@ -101,8 +101,8 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 	ctx, _ = trace.StartSpan(ctx, "BalanceStore.Deposit")
 	defer trace.EndSpan(ctx, err)
 
-	var ub *UserBalance
-	var udh *UserDepositHistory
+	var ub UserBalance
+	var udh UserDepositHistory
 	resp, err := s.sc.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
 		var mus []*spanner.Mutation
 		row, err := tx.ReadRowWithOptions(ctx, s.UserBalanceTable(),
@@ -112,7 +112,7 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 				RequestTag: spanners.AppTag(),
 			})
 		if spanner.ErrCode(err) == codes.NotFound {
-			ub = &UserBalance{
+			ub = UserBalance{
 				UserID:    userID,
 				Amount:    amount,
 				Point:     point,
@@ -121,7 +121,7 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 		} else if err != nil {
 			return fmt.Errorf("failed read UserBalance : %w", err)
 		} else {
-			if err := row.ToStruct(ub); err != nil {
+			if err := row.ToStruct(&ub); err != nil {
 				return fmt.Errorf("failed spanner.Row.ToStruct to UserBalance : %w", err)
 			}
 			ub.Amount += amount
@@ -134,7 +134,7 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 		}
 		mus = append(mus, ubMu)
 
-		udh = &UserDepositHistory{
+		udh = UserDepositHistory{
 			UserID:      userID,
 			DepositID:   depositID,
 			DepositType: depositType,
@@ -158,7 +158,7 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 	ub.CreatedAt = resp.CommitTs
 	udh.CreatedAt = resp.CommitTs
 
-	return ub, udh, nil
+	return &ub, &udh, nil
 }
 
 func CreateUserID(ctx context.Context, id int64) string {
