@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -45,7 +46,10 @@ func main() {
 	}
 	fmt.Printf("SRUNNER_SERVICE_NAME=%s\n", serviceName)
 
-	runner := runner()
+	runner, err := runner()
+	if err != nil {
+		panic(err)
+	}
 
 	trace.Init(ctx, serviceName, "v0.0.0")
 
@@ -59,15 +63,20 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if ok := runner["CREATE_USER_ACCOUNT"]; ok {
+	if _, ok := runner["CREATE_USER_ACCOUNT"]; ok {
+		fmt.Println("Ignite CREATE_USER_ACCOUNT")
 		if err := runCreateUserAccount(ctx, balanceStore, 1, balance.UserAccountIDMax); err != nil {
 			panic(err)
 		}
 	}
-	if ok := runner["DEPOSIT"]; ok {
-		go runBalanceDeposit(ctx, balanceStore)
+	if parallels, ok := runner["DEPOSIT"]; ok {
+		fmt.Printf("Ignite DEPOSIT:%d\n", parallels)
+		for i := 0; i < parallels; i++ {
+			go runBalanceDeposit(ctx, balanceStore)
+		}
 	}
-	if ok := runner["TWEET"]; ok {
+	if _, ok := runner["TWEET"]; ok {
+		fmt.Println("Ignite TWEET")
 		ts := tweet.NewStore(sc)
 		go runTweet(ctx, ts)
 	}
@@ -81,14 +90,23 @@ func main() {
 	fmt.Println("Shutdown srunner")
 }
 
-func runner() map[string]bool {
-	runner := make(map[string]bool)
-	runnersParam := os.Getenv("SRUNNER_RUNNERS")
+func runner() (map[string]int, error) {
+	runner := make(map[string]int)
+	runnersParam := os.Getenv("SRUNNER_RUNNERS") // DEPOSIT:10,TWEET:1 というformatを期待している
 	runners := strings.Split(runnersParam, ",")
 	for _, v := range runners {
-		runner[v] = true
+		l := strings.Split(v, ":")
+		if len(l) > 1 {
+			parallels, err := strconv.Atoi(l[1])
+			if err != nil {
+				return nil, fmt.Errorf("invalid $SRUNNER_RUNNERS format %s : %w", runnersParam, err)
+			}
+			runner[l[0]] = parallels
+		} else if len(l) == 1 {
+			runner[l[0]] = 1
+		}
 	}
-	return runner
+	return runner, nil
 }
 
 func runTweet(ctx context.Context, ts tweet.Store) {
