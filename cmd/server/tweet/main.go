@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/sinmetal/srunner/internal/profiler"
 	"log"
 	"math/rand"
 	"os"
@@ -21,6 +22,10 @@ import (
 )
 
 var signalChan = make(chan os.Signal, 1)
+
+const (
+	serviceVersion = "v0.0.0"
+)
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -51,7 +56,10 @@ func main() {
 		panic(err)
 	}
 
-	trace.Init(ctx, serviceName, "v0.0.0")
+	trace.Init(ctx, serviceName, serviceVersion)
+	if err := profiler.Init(ctx, serviceName, serviceVersion); err != nil {
+		panic(err)
+	}
 
 	// meterProvider := trace.GetMeterProvider() // otel.SetMeterProviderでglobalにセットしている
 	sc, err := spanner.NewClient(ctx, dbName)
