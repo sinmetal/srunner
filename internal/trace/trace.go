@@ -14,6 +14,7 @@ import (
 	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 	"go.opentelemetry.io/contrib/detectors/gcp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -134,6 +135,15 @@ func newResource(ctx context.Context, serviceName string, revision string) (*res
 
 func StartSpan(ctx context.Context, spanName string, ops ...trace.SpanStartOption) (context.Context, trace.Span) {
 	return tracer.Start(ctx, spanName, ops...)
+}
+
+func EndSpan(ctx context.Context, err error) {
+	span := trace.SpanFromContext(ctx)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		span.RecordError(err)
+	}
+	span.End()
 }
 
 func GetMeterProvider() *sdkmetric.MeterProvider {
