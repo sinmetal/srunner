@@ -73,7 +73,6 @@ func main() {
 		panic(err)
 	}
 
-	mainRunner := &srunner.AppRunnner{}
 	balanceRunner := &balance.Runner{
 		BalanceStore: balanceStore,
 	}
@@ -84,9 +83,10 @@ func main() {
 			panic(err)
 		}
 	}
-	if parallels, ok := runner["DEPOSIT"]; ok {
-		fmt.Printf("Ignite DEPOSIT:%d\n", parallels)
-		mainRunner.Run(ctx, "Balance.Deposit", parallels, balanceRunner)
+	if rate, ok := runner["DEPOSIT"]; ok {
+		fmt.Printf("Ignite DEPOSIT:%d\n", rate)
+		ar := srunner.NewAppRunner(ctx, rate, 100)
+		ar.Run(ctx, "Balance.Deposit", balanceRunner)
 	}
 	if _, ok := runner["TWEET"]; ok {
 		fmt.Println("Ignite TWEET")
