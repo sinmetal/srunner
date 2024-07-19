@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/sinmetal/srunner/internal/profiler"
 	"log"
 	"math/rand"
 	"os"
@@ -15,7 +14,9 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
+	"github.com/sinmetal/srunner"
 	"github.com/sinmetal/srunner/balance"
+	"github.com/sinmetal/srunner/internal/profiler"
 	"github.com/sinmetal/srunner/internal/trace"
 	"github.com/sinmetal/srunner/randdata"
 	"github.com/sinmetal/srunner/tweet"
@@ -71,6 +72,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	mainRunner := &srunner.Runnner{}
+	balanceRunner := &balance.Runner{
+		BalanceStore: balanceStore,
+	}
+
 	if _, ok := runner["CREATE_USER_ACCOUNT"]; ok {
 		fmt.Println("Ignite CREATE_USER_ACCOUNT")
 		if err := runCreateUserAccount(ctx, balanceStore, 1, balance.UserAccountIDMax); err != nil {
@@ -79,9 +86,7 @@ func main() {
 	}
 	if parallels, ok := runner["DEPOSIT"]; ok {
 		fmt.Printf("Ignite DEPOSIT:%d\n", parallels)
-		for i := 0; i < parallels; i++ {
-			go runBalanceDeposit(ctx, balanceStore)
-		}
+		mainRunner.Run(ctx, "Balance.Deposit", parallels, balanceRunner.Run)
 	}
 	if _, ok := runner["TWEET"]; ok {
 		fmt.Println("Ignite TWEET")
@@ -163,48 +168,4 @@ func runCreateUserAccount(ctx context.Context, bs *balance.Store, idRangeStart, 
 		}
 	}
 	return nil
-}
-
-func runBalanceDeposit(ctx context.Context, bs *balance.Store) {
-	for {
-		select {
-		case <-ctx.Done():
-			fmt.Println("stop run balance.Deposit")
-			return
-		default:
-			userAccountID := balance.RandomUserID(ctx)
-			depositID := balance.CreateDepositID(ctx)
-			var amount int64
-			var point int64
-			depositType := balance.RandomDepositType(ctx)
-			switch depositType {
-			case balance.DepositTypeBank:
-				switch rand.Intn(5) {
-				case 1:
-					amount = 10000
-				case 2:
-					amount = 20000
-				case 3:
-					amount = 30000
-				default:
-					amount = int64(1000 + rand.Intn(200000))
-				}
-			case balance.DepositTypeCampaignPoint:
-				point = int64(10 + rand.Intn(1000))
-			case balance.DepositTypeRefund:
-				amount = int64(10 + rand.Intn(1000))
-			case balance.DepositTypeSales:
-				amount = int64(500 + rand.Intn(10000))
-				point = int64(500 + rand.Intn(10000))
-			default:
-				fmt.Println("unsupported DepositType")
-				continue
-			}
-			_, _, err := bs.Deposit(ctx, userAccountID, depositID, depositType, amount, point)
-			if err != nil {
-				fmt.Printf("failed balance.Depoist err=%s\n", err)
-				time.Sleep(time.Duration(10+rand.Intn(600)) * time.Second)
-			}
-		}
-	}
 }
