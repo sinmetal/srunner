@@ -85,7 +85,7 @@ func main() {
 	}
 	if rate, ok := runner["DEPOSIT"]; ok {
 		fmt.Printf("Ignite DEPOSIT:%d\n", rate)
-		ar := srunner.NewAppRunner(ctx, rate, 100)
+		ar := srunner.NewAppRunner(ctx, rate, 200)
 		ar.Run(ctx, "Balance.Deposit", balanceRunner)
 	}
 	if _, ok := runner["TWEET"]; ok {
