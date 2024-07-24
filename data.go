@@ -1,4 +1,4 @@
-package main
+package srunner
 
 import "math/rand"
 
