@@ -63,7 +63,8 @@ func main() {
 	}
 
 	// meterProvider := trace.GetMeterProvider() // otel.SetMeterProviderでglobalにセットしている
-	sc, err := spanner.NewClient(ctx, dbName)
+	// sc, err := spanner.NewClient(ctx, dbName)
+	sc, err := spanner.NewClientWithConfig(ctx, dbName, spanner.ClientConfig{})
 	if err != nil {
 		panic(err)
 	}
