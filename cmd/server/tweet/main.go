@@ -113,8 +113,8 @@ func main() {
 
 func runner() (map[string]int, error) {
 	runner := make(map[string]int)
-	runnersParam := os.Getenv("SRUNNER_RUNNERS") // DEPOSIT:10,TWEET:1 というformatを期待している
-	runners := strings.Split(runnersParam, ",")
+	runnersParam := os.Getenv("SRUNNER_RUNNERS") // DEPOSIT:10;TWEET:1 というformatを期待している
+	runners := strings.Split(runnersParam, ";")
 	for _, v := range runners {
 		l := strings.Split(v, ":")
 		if len(l) > 1 {
