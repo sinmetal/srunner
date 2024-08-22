@@ -20,6 +20,7 @@ import (
 	"github.com/sinmetal/srunner/internal/trace"
 	"github.com/sinmetal/srunner/randdata"
 	"github.com/sinmetal/srunner/tweet"
+	"google.golang.org/grpc/codes"
 )
 
 var signalChan = make(chan os.Signal, 1)
@@ -180,6 +181,9 @@ func runCreateUserAccount(ctx context.Context, bs *balance.Store, idRangeStart, 
 			Height: int64(50 + rand.Intn(150)),
 			Weight: int64(30 + rand.Intn(100)),
 		})
+		if spanner.ErrCode(err) == codes.AlreadyExists {
+			continue
+		}
 		if err != nil {
 			return fmt.Errorf("failed balance.CreateUserAccount idRange=%d-%d; userID=%s : %w", idRangeStart, idRangeEnd, userID, err)
 		}
