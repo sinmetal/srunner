@@ -11,6 +11,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.24.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.48.0
 	github.com/google/uuid v1.6.0
+	github.com/k0kubun/pp v3.0.1+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/sinmetalcraft/gcpbox v1.24.0
 	go.opencensus.io v0.24.0
@@ -21,6 +22,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.27.0
 	golang.org/x/oauth2 v0.21.0
 	golang.org/x/sync v0.7.0
+	golang.org/x/time v0.5.0
 	google.golang.org/api v0.186.0
 	google.golang.org/genproto v0.0.0-20240624140628-dc46fd24d27d
 	google.golang.org/grpc v1.64.0
@@ -54,6 +56,8 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/prometheus/prometheus v0.53.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.52.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.52.0 // indirect
@@ -62,7 +66,6 @@ require (
 	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
-	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240624140628-dc46fd24d27d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240624140628-dc46fd24d27d // indirect
