@@ -52,6 +52,15 @@ func main() {
 	}
 	fmt.Printf("SRUNNER_SERVICE_NAME=%s\n", serviceName)
 
+	userMaxParam := os.Getenv("SRUNNER_USER_MAX")
+	if len(userMaxParam) > 0 {
+		userMax, err := strconv.ParseInt(userMaxParam, 10, 64)
+		if err != nil {
+			panic(fmt.Errorf("failed parse $SRUNNER_USER_MAX = %s : %w", userMaxParam, err))
+		}
+		balance.SetUserAccountIDMax(userMax)
+	}
+
 	runner, err := runner()
 	if err != nil {
 		panic(err)
@@ -82,7 +91,7 @@ func main() {
 
 	if _, ok := runner["CREATE_USER_ACCOUNT"]; ok {
 		fmt.Println("Ignite CREATE_USER_ACCOUNT")
-		if err := runCreateUserAccount(ctx, balanceStore, 1, balance.UserAccountIDMax); err != nil {
+		if err := runCreateUserAccount(ctx, balanceStore, 1, balance.UserAccountIDMax()); err != nil {
 			panic(err)
 		}
 	}
