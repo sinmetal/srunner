@@ -15,9 +15,16 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-const (
-	UserAccountIDMax = 1000000
-)
+var userAccountIDMax int64 = 1000000
+
+func UserAccountIDMax() int64 {
+	return userAccountIDMax
+}
+
+// SetUserAccountIDMax is default値から変更する場合、アプリケーション起動時に一度だけ呼ぶ
+func SetUserAccountIDMax(v int64) {
+	userAccountIDMax = v
+}
 
 type Store struct {
 	sc *spanner.Client
@@ -260,7 +267,7 @@ func CreateUserID(ctx context.Context, id int64) string {
 }
 
 func RandomUserID(ctx context.Context) string {
-	v := rand.Int63n(UserAccountIDMax)
+	v := rand.Int63n(UserAccountIDMax())
 	if v == 0 {
 		return CreateUserID(ctx, 1)
 	}

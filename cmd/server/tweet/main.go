@@ -20,6 +20,7 @@ import (
 	"github.com/sinmetal/srunner/internal/trace"
 	"github.com/sinmetal/srunner/randdata"
 	"github.com/sinmetal/srunner/tweet"
+	"google.golang.org/grpc/codes"
 )
 
 var signalChan = make(chan os.Signal, 1)
@@ -52,6 +53,15 @@ func main() {
 	}
 	fmt.Printf("SRUNNER_SERVICE_NAME=%s\n", serviceName)
 
+	userMaxParam := os.Getenv("SRUNNER_USER_MAX")
+	if len(userMaxParam) > 0 {
+		userMax, err := strconv.ParseInt(userMaxParam, 10, 64)
+		if err != nil {
+			panic(fmt.Errorf("failed parse $SRUNNER_USER_MAX = %s : %w", userMaxParam, err))
+		}
+		balance.SetUserAccountIDMax(userMax)
+	}
+
 	runner, err := runner()
 	if err != nil {
 		panic(err)
@@ -82,7 +92,7 @@ func main() {
 
 	if _, ok := runner["CREATE_USER_ACCOUNT"]; ok {
 		fmt.Println("Ignite CREATE_USER_ACCOUNT")
-		if err := runCreateUserAccount(ctx, balanceStore, 1, balance.UserAccountIDMax); err != nil {
+		if err := runCreateUserAccount(ctx, balanceStore, 1, balance.UserAccountIDMax()); err != nil {
 			panic(err)
 		}
 	}
@@ -171,6 +181,9 @@ func runCreateUserAccount(ctx context.Context, bs *balance.Store, idRangeStart, 
 			Height: int64(50 + rand.Intn(150)),
 			Weight: int64(30 + rand.Intn(100)),
 		})
+		if spanner.ErrCode(err) == codes.AlreadyExists {
+			continue
+		}
 		if err != nil {
 			return fmt.Errorf("failed balance.CreateUserAccount idRange=%d-%d; userID=%s : %w", idRangeStart, idRangeEnd, userID, err)
 		}
