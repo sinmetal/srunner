@@ -54,12 +54,21 @@ type UserBalance struct {
 }
 
 type UserDepositHistory struct {
-	UserID      string
-	DepositID   string
-	DepositType DepositType `spanner:"-"`
-	Amount      int64
-	Point       int64
-	CreatedAt   time.Time
+	UserID                       string
+	DepositID                    string
+	DepositType                  DepositType `spanner:"-"`
+	Amount                       int64
+	Point                        int64
+	SupplementaryInformationJson spanner.NullJSON
+	SupplementaryInformation     *SupplementaryInformation `spanner:"-"`
+	CreatedAt                    time.Time
+}
+
+type SupplementaryInformation struct {
+	Name   spanner.NullString   `json:"name"`
+	Rating spanner.NullFloat64  `json:"rating"`
+	Open   interface{}          `json:"open"`
+	Tags   []spanner.NullString `json:"tags"`
 }
 
 func (v *UserDepositHistory) FromRow(row *spanner.Row) (*UserDepositHistory, error) {
@@ -93,6 +102,7 @@ func (v *UserDepositHistory) ToMutationMap() map[string]interface{} {
 	m["DepositType"] = v.DepositType.ToIntn()
 	m["Amount"] = v.Amount
 	m["Point"] = v.Point
+	m["SupplementaryInformation"] = v.SupplementaryInformationJson
 	m["CreatedAt"] = v.CreatedAt
 	return m
 }
@@ -167,13 +177,30 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 		}
 		mus = append(mus, ubMu)
 
+		info := SupplementaryInformation{
+			Name: spanner.NullString{
+				StringVal: uuid.New().String(),
+				Valid:     true,
+			},
+			Rating: spanner.NullFloat64{
+				Float64: rand.Float64(),
+				Valid:   true,
+			},
+			Open: RandomOpen(),
+			Tags: RandomTags(),
+		}
+		infoJson := spanner.NullJSON{
+			Value: info,
+			Valid: true,
+		}
 		udh = UserDepositHistory{
-			UserID:      userID,
-			DepositID:   depositID,
-			DepositType: depositType,
-			Amount:      amount,
-			Point:       point,
-			CreatedAt:   spanner.CommitTimestamp,
+			UserID:                       userID,
+			DepositID:                    depositID,
+			DepositType:                  depositType,
+			Amount:                       amount,
+			Point:                        point,
+			SupplementaryInformationJson: infoJson,
+			CreatedAt:                    spanner.CommitTimestamp,
 		}
 		udhMu := spanner.InsertMap(s.UserDepositHistoryTable(), udh.ToMutationMap())
 		mus = append(mus, udhMu)
@@ -290,4 +317,63 @@ func RandomDepositType(ctx context.Context) DepositType {
 	default:
 		return DepositTypeBank
 	}
+}
+
+func RandomOpen() map[string]bool {
+	m := map[string]bool{}
+	count := rand.Intn(7)
+	for i := 0; count > i; i++ {
+		n := rand.Intn(10)
+		switch n {
+		case 0:
+			m["monday"] = true
+		case 1:
+			m["tuesday"] = true
+		case 2:
+			m["wednesday"] = true
+		case 3:
+			m["thursday"] = true
+		case 4:
+			m["friday"] = true
+		case 5:
+			m["saturday"] = true
+		case 6:
+			m["sunday"] = true
+		default:
+		}
+	}
+	return m
+}
+
+func RandomTags() []spanner.NullString {
+	m := map[string]bool{}
+	count := rand.Intn(10)
+	for i := 0; count > i; i++ {
+		n := rand.Intn(9)
+		switch n {
+		case 1:
+			m["ComputeEngine"] = true
+		case 2:
+			m["CloudRun"] = true
+		case 3:
+			m["CloudSpanner"] = true
+		case 4:
+			m["BigQuery"] = true
+		case 5:
+			m["AppEngine"] = true
+		case 6:
+			m["CloudFirestore"] = true
+		case 7:
+			m["Dataflow"] = true
+		default:
+			m["ComputeEngine"] = true
+			m["CloudStorage"] = true
+		}
+	}
+
+	var tags []spanner.NullString
+	for k, _ := range m {
+		tags = append(tags, spanner.NullString{StringVal: k, Valid: true})
+	}
+	return tags
 }
