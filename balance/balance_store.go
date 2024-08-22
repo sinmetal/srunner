@@ -2,6 +2,7 @@ package balance
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sinmetal/srunner/internal/trace"
 	"github.com/sinmetal/srunner/spanners"
+	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 )
 
@@ -47,10 +49,34 @@ type UserBalance struct {
 type UserDepositHistory struct {
 	UserID      string
 	DepositID   string
-	DepositType DepositType
+	DepositType DepositType `spanner:"-"`
 	Amount      int64
 	Point       int64
 	CreatedAt   time.Time
+}
+
+func (v *UserDepositHistory) FromRow(row *spanner.Row) (*UserDepositHistory, error) {
+	ret := &UserDepositHistory{}
+
+	if err := row.ColumnByName("UserID", &ret.UserID); err != nil {
+		return nil, err
+	}
+	if err := row.ColumnByName("DepositID", &ret.DepositID); err != nil {
+		return nil, err
+	}
+	var retDepositType int64
+	if err := row.ColumnByName("DepositType", &retDepositType); err != nil {
+		return nil, err
+	}
+	ret.DepositType = DepositType(retDepositType)
+
+	if err := row.ColumnByName("Amount", &ret.Amount); err != nil {
+		return nil, err
+	}
+	if err := row.ColumnByName("Point", &ret.Point); err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 func (v *UserDepositHistory) ToMutationMap() map[string]interface{} {
@@ -159,6 +185,74 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 	udh.CreatedAt = resp.CommitTs
 
 	return &ub, &udh, nil
+}
+
+func (s *Store) DepositDML(ctx context.Context, userID string, depositID string, depositType DepositType, amount int64, point int64) (userBalance *UserBalance, userDepositHistories *UserDepositHistory, err error) {
+	ctx, _ = trace.StartSpan(ctx, "BalanceStore.DepositDML")
+	defer trace.EndSpan(ctx, err)
+
+	var ub UserBalance
+	var udh *UserDepositHistory
+	_, err = s.sc.ReadWriteTransaction(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
+		insertDepositHistory := spanner.NewStatement(
+			fmt.Sprintf("INSERT %s (UserID, DepositID, DepositType, Amount, Point, CreatedAt)"+
+				" VALUES (@UserID, @DepositID, @DepositType, @Amount, @Point, PENDING_COMMIT_TIMESTAMP())"+
+				" THEN RETURN UserID, DepositID, DepositType, Amount, Point", s.UserDepositHistoryTable()),
+		)
+		insertDepositHistory.Params = map[string]interface{}{
+			"UserID":      userID,
+			"DepositID":   depositID,
+			"DepositType": depositType.ToIntn(),
+			"Amount":      amount,
+			"Point":       point,
+		}
+		iter := tx.Query(ctx, insertDepositHistory)
+		for {
+			row, err := iter.Next()
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			if err != nil {
+				return fmt.Errorf("failed Insert to DepositHistory: %w", err)
+			}
+			if udh, err = udh.FromRow(row); err != nil {
+				return fmt.Errorf("failed Insert to DepositHistory result to Struct: %w", err)
+			}
+		}
+
+		updateUserBalance := spanner.NewStatement(
+			fmt.Sprintf("UPDATE %s SET Amount = Amount + @Amount, Point = Point + @Point, UpdatedAt = PENDING_COMMIT_TIMESTAMP()"+
+				" WHERE UserID = @UserID"+
+				" THEN RETURN UserID, Amount, Point", s.UserBalanceTable()),
+		)
+		updateUserBalance.Params = map[string]interface{}{
+			"UserID": userID,
+			"Amount": amount,
+			"Point":  point,
+		}
+		iter = tx.Query(ctx, updateUserBalance)
+		for {
+			row, err := iter.Next()
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			if err != nil {
+				return fmt.Errorf("failed Update to UserBalance: %w", err)
+			}
+			if err := row.ToStruct(&ub); err != nil {
+				return fmt.Errorf("failed Update to UserBalance result to Struct: %w", err)
+			}
+		}
+
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return &ub, udh, err
 }
 
 func CreateUserID(ctx context.Context, id int64) string {

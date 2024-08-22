@@ -73,7 +73,10 @@ func main() {
 		panic(err)
 	}
 
-	balanceRunner := &balance.Runner{
+	balanceDepositRunner := &balance.DepositRunner{
+		BalanceStore: balanceStore,
+	}
+	balanceDepositDMLRunner := &balance.DepositDMLRunner{
 		BalanceStore: balanceStore,
 	}
 
@@ -86,7 +89,12 @@ func main() {
 	if rate, ok := runner["DEPOSIT"]; ok {
 		fmt.Printf("Ignite DEPOSIT:%d\n", rate)
 		ar := srunner.NewAppRunner(ctx, rate, 200)
-		ar.Run(ctx, "Balance.Deposit", balanceRunner)
+		ar.Run(ctx, "Balance.Deposit", balanceDepositRunner)
+	}
+	if rate, ok := runner["DEPOSIT_DML"]; ok {
+		fmt.Printf("Ignite DEPOSIT_DML:%d\n", rate)
+		ar := srunner.NewAppRunner(ctx, rate, 200)
+		ar.Run(ctx, "Balance.DepositDML", balanceDepositDMLRunner)
 	}
 	if _, ok := runner["TWEET"]; ok {
 		fmt.Println("Ignite TWEET")
@@ -105,8 +113,8 @@ func main() {
 
 func runner() (map[string]int, error) {
 	runner := make(map[string]int)
-	runnersParam := os.Getenv("SRUNNER_RUNNERS") // DEPOSIT:10,TWEET:1 というformatを期待している
-	runners := strings.Split(runnersParam, ",")
+	runnersParam := os.Getenv("SRUNNER_RUNNERS") // DEPOSIT:10;TWEET:1 というformatを期待している
+	runners := strings.Split(runnersParam, ";")
 	for _, v := range runners {
 		l := strings.Split(v, ":")
 		if len(l) > 1 {
