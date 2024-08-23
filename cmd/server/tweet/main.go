@@ -18,6 +18,7 @@ import (
 	"github.com/sinmetal/srunner/balance"
 	"github.com/sinmetal/srunner/internal/profiler"
 	"github.com/sinmetal/srunner/internal/trace"
+	"github.com/sinmetal/srunner/operation"
 	"github.com/sinmetal/srunner/randdata"
 	"github.com/sinmetal/srunner/tweet"
 	"google.golang.org/grpc/codes"
@@ -83,11 +84,18 @@ func main() {
 		panic(err)
 	}
 
+	operationStore, err := operation.NewStore(ctx, sc)
+	if err != nil {
+		panic(err)
+	}
+
 	balanceDepositRunner := &balance.DepositRunner{
-		BalanceStore: balanceStore,
+		BalanceStore:   balanceStore,
+		OperationStore: operationStore,
 	}
 	balanceDepositDMLRunner := &balance.DepositDMLRunner{
-		BalanceStore: balanceStore,
+		BalanceStore:   balanceStore,
+		OperationStore: operationStore,
 	}
 
 	if _, ok := runner["CREATE_USER_ACCOUNT"]; ok {
