@@ -2,6 +2,7 @@ package balance
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -54,35 +55,73 @@ type UserBalance struct {
 }
 
 type UserDepositHistory struct {
-	UserID      string
-	DepositID   string
-	DepositType DepositType `spanner:"-"`
-	Amount      int64
-	Point       int64
-	CreatedAt   time.Time
+	UserID                   string
+	DepositID                string
+	DepositType              DepositType `spanner:"-"`
+	Amount                   int64
+	Point                    int64
+	SupplementaryInformation *SupplementaryInformation `spanner:"-"`
+	CreatedAt                time.Time
+}
+
+type SupplementaryInformation struct {
+	Name   string      `json:"name"`
+	Rating float64     `json:"rating"`
+	Open   interface{} `json:"open"`
+	Tags   []string    `json:"tags"`
 }
 
 func (v *UserDepositHistory) FromRow(row *spanner.Row) (*UserDepositHistory, error) {
 	ret := &UserDepositHistory{}
 
 	if err := row.ColumnByName("UserID", &ret.UserID); err != nil {
-		return nil, err
+		if spanner.ErrCode(err) != codes.NotFound {
+			return nil, err
+		}
 	}
 	if err := row.ColumnByName("DepositID", &ret.DepositID); err != nil {
-		return nil, err
+		if spanner.ErrCode(err) != codes.NotFound {
+			return nil, err
+		}
 	}
 	var retDepositType int64
 	if err := row.ColumnByName("DepositType", &retDepositType); err != nil {
-		return nil, err
+		if spanner.ErrCode(err) != codes.NotFound {
+			return nil, err
+		}
 	}
 	ret.DepositType = DepositType(retDepositType)
 
 	if err := row.ColumnByName("Amount", &ret.Amount); err != nil {
-		return nil, err
+		if spanner.ErrCode(err) != codes.NotFound {
+			return nil, err
+		}
 	}
 	if err := row.ColumnByName("Point", &ret.Point); err != nil {
-		return nil, err
+		if spanner.ErrCode(err) != codes.NotFound {
+			return nil, err
+		}
 	}
+	if err := row.ColumnByName("CreatedAt", &ret.CreatedAt); err != nil {
+		if spanner.ErrCode(err) != codes.NotFound {
+			return nil, err
+		}
+	}
+
+	var info spanner.NullJSON
+	if err := row.ColumnByName("SupplementaryInformation", &info); err != nil {
+		if spanner.ErrCode(err) != codes.NotFound {
+			return nil, err
+		}
+	}
+	if info.Valid {
+		var v SupplementaryInformation
+		if err := json.Unmarshal([]byte(info.String()), &v); err != nil {
+			return nil, fmt.Errorf("failed SupplementaryInformation.Unmarshal")
+		}
+		ret.SupplementaryInformation = &v
+	}
+
 	return ret, nil
 }
 
@@ -93,6 +132,15 @@ func (v *UserDepositHistory) ToMutationMap() map[string]interface{} {
 	m["DepositType"] = v.DepositType.ToIntn()
 	m["Amount"] = v.Amount
 	m["Point"] = v.Point
+
+	if v.SupplementaryInformation != nil {
+		j := spanner.NullJSON{
+			Value: v.SupplementaryInformation,
+			Valid: true,
+		}
+		m["SupplementaryInformation"] = j
+	}
+
 	m["CreatedAt"] = v.CreatedAt
 	return m
 }
@@ -167,13 +215,21 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 		}
 		mus = append(mus, ubMu)
 
+		info := SupplementaryInformation{
+			Name:   uuid.New().String(),
+			Rating: rand.Float64(),
+			Open:   RandomOpen(),
+			Tags:   RandomTags(),
+		}
+
 		udh = UserDepositHistory{
-			UserID:      userID,
-			DepositID:   depositID,
-			DepositType: depositType,
-			Amount:      amount,
-			Point:       point,
-			CreatedAt:   spanner.CommitTimestamp,
+			UserID:                   userID,
+			DepositID:                depositID,
+			DepositType:              depositType,
+			Amount:                   amount,
+			Point:                    point,
+			SupplementaryInformation: &info,
+			CreatedAt:                spanner.CommitTimestamp,
 		}
 		udhMu := spanner.InsertMap(s.UserDepositHistoryTable(), udh.ToMutationMap())
 		mus = append(mus, udhMu)
@@ -262,6 +318,50 @@ func (s *Store) DepositDML(ctx context.Context, userID string, depositID string,
 	return &ub, udh, err
 }
 
+func (s *Store) SelectUserDepositHistory(ctx context.Context, userID string, limit int) (list []*UserDepositHistory, err error) {
+	ctx, _ = trace.StartSpan(ctx, "BalanceStore.SelectUserDepositHistory")
+	defer trace.EndSpan(ctx, err)
+
+	const q = `
+SELECT 
+  UserID,
+	DepositID,
+	DepositType,
+	Amount,
+	Point,
+	SupplementaryInformation,
+	CreatedAt
+FROM UserDepositHistory
+WHERE UserID = @UserID
+ORDER BY CreatedAt DESC
+LIMIT @Limit
+`
+
+	stm := spanner.NewStatement(q)
+	stm.Params = map[string]interface{}{
+		"UserID": userID,
+		"Limit":  limit,
+	}
+
+	iter := s.sc.Single().Query(ctx, stm)
+	for {
+		row, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed SelectUserDepositHistory : %w", err)
+		}
+		v := &UserDepositHistory{}
+		v, err = v.FromRow(row)
+		if err != nil {
+			return nil, fmt.Errorf("failed UserDepositHistory.FromRow : %w", err)
+		}
+		list = append(list, v)
+	}
+	return list, nil
+}
+
 func CreateUserID(ctx context.Context, id int64) string {
 	return fmt.Sprintf("u%010d", id)
 }
@@ -290,4 +390,63 @@ func RandomDepositType(ctx context.Context) DepositType {
 	default:
 		return DepositTypeBank
 	}
+}
+
+func RandomOpen() map[string]bool {
+	m := map[string]bool{}
+	count := rand.Intn(7)
+	for i := 0; count > i; i++ {
+		n := rand.Intn(10)
+		switch n {
+		case 0:
+			m["monday"] = true
+		case 1:
+			m["tuesday"] = true
+		case 2:
+			m["wednesday"] = true
+		case 3:
+			m["thursday"] = true
+		case 4:
+			m["friday"] = true
+		case 5:
+			m["saturday"] = true
+		case 6:
+			m["sunday"] = true
+		default:
+		}
+	}
+	return m
+}
+
+func RandomTags() []string {
+	m := map[string]bool{}
+	count := rand.Intn(10)
+	for i := 0; count > i; i++ {
+		n := rand.Intn(9)
+		switch n {
+		case 1:
+			m["ComputeEngine"] = true
+		case 2:
+			m["CloudRun"] = true
+		case 3:
+			m["CloudSpanner"] = true
+		case 4:
+			m["BigQuery"] = true
+		case 5:
+			m["AppEngine"] = true
+		case 6:
+			m["CloudFirestore"] = true
+		case 7:
+			m["Dataflow"] = true
+		default:
+			m["ComputeEngine"] = true
+			m["CloudStorage"] = true
+		}
+	}
+
+	var tags []string
+	for k, _ := range m {
+		tags = append(tags, k)
+	}
+	return tags
 }
