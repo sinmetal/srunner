@@ -4,10 +4,16 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"time"
+
+	"cloud.google.com/go/spanner"
+	"github.com/google/uuid"
+	"github.com/sinmetal/srunner/operation"
 )
 
 type DepositRunner struct {
-	BalanceStore *Store
+	BalanceStore   *Store
+	OperationStore *operation.Store
 }
 
 func (r *DepositRunner) Run(ctx context.Context) error {
@@ -39,15 +45,28 @@ func (r *DepositRunner) Run(ctx context.Context) error {
 		fmt.Println("unsupported DepositType")
 		return nil
 	}
+	start := time.Now()
 	_, _, err := r.BalanceStore.Deposit(ctx, userAccountID, depositID, depositType, amount, point)
 	if err != nil {
 		return fmt.Errorf("failed balance.Depoist err=%s\n", err)
+	}
+	elapsed := time.Since(start)
+	_, err = r.OperationStore.Insert(ctx, &operation.Operation{
+		OperationID:   uuid.New().String(),
+		OperationName: "BalanceStore.Deposit",
+		ElapsedTimeMS: elapsed.Milliseconds(),
+		Note:          spanner.NullJSON{},
+		CommitedAt:    spanner.CommitTimestamp,
+	})
+	if err != nil {
+		return fmt.Errorf("failed OperationStore.Insert err=%s\n", err)
 	}
 	return nil
 }
 
 type DepositDMLRunner struct {
-	BalanceStore *Store
+	BalanceStore   *Store
+	OperationStore *operation.Store
 }
 
 func (r *DepositDMLRunner) Run(ctx context.Context) error {
@@ -79,9 +98,22 @@ func (r *DepositDMLRunner) Run(ctx context.Context) error {
 		fmt.Println("unsupported DepositType")
 		return nil
 	}
+
+	start := time.Now()
 	_, _, err := r.BalanceStore.DepositDML(ctx, userAccountID, depositID, depositType, amount, point)
 	if err != nil {
 		return fmt.Errorf("failed balance.DepositDML err=%s\n", err)
+	}
+	elapsed := time.Since(start)
+	_, err = r.OperationStore.Insert(ctx, &operation.Operation{
+		OperationID:   uuid.New().String(),
+		OperationName: "BalanceStore.DepositDML",
+		ElapsedTimeMS: elapsed.Milliseconds(),
+		Note:          spanner.NullJSON{},
+		CommitedAt:    spanner.CommitTimestamp,
+	})
+	if err != nil {
+		return fmt.Errorf("failed OperationStore.Insert err=%s\n", err)
 	}
 	return nil
 }

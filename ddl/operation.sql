@@ -1,18 +1,12 @@
 CREATE TABLE Operation (
-	Id STRING(MAX) NOT NULL,
-	VERB STRING(MAX) NOT NULL,
-	TargetKey STRING(MAX) NOT NULL,
-	TargetTable STRING(MAX) NOT NULL,
-	Body BYTES(MAX),
+	OperationID STRING(MAX) NOT NULL,
+    OperationName STRING(MAX) NOT NULL,
+    ElapsedTimeMS INT64 NOT NULL,
+    Note JSON,
 	CommitedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
-) PRIMARY KEY (Id);
+) PRIMARY KEY (OperationID);
 
-CREATE INDEX OperationTargetKey
+CREATE INDEX OperationNameAndElapsedTimeMSByOperation
 ON Operation (
-TargetKey
-);
-
-CREATE INDEX OperationTargetTable
-ON Operation (
-TargetTable
+  OperationName, ElapsedTimeMS DESC
 );
