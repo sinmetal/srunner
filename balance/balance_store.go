@@ -180,7 +180,7 @@ func (s *Store) CreateUserAccount(ctx context.Context, userAccount *UserAccount)
 
 func (s *Store) Deposit(ctx context.Context, userID string, depositID string, depositType DepositType, amount int64, point int64) (userBalance *UserBalance, userDepositHistories *UserDepositHistory, err error) {
 	ctx, _ = trace.StartSpan(ctx, "BalanceStore.Deposit")
-	defer trace.EndSpan(ctx, err)
+	defer func() { trace.EndSpan(ctx, err) }()
 
 	var ub UserBalance
 	var udh UserDepositHistory
@@ -252,7 +252,7 @@ func (s *Store) Deposit(ctx context.Context, userID string, depositID string, de
 
 func (s *Store) DepositDML(ctx context.Context, userID string, depositID string, depositType DepositType, amount int64, point int64) (userBalance *UserBalance, userDepositHistories *UserDepositHistory, err error) {
 	ctx, _ = trace.StartSpan(ctx, "BalanceStore.DepositDML")
-	defer trace.EndSpan(ctx, err)
+	defer func() { trace.EndSpan(ctx, err) }()
 
 	var ub UserBalance
 	var udh *UserDepositHistory
@@ -320,7 +320,7 @@ func (s *Store) DepositDML(ctx context.Context, userID string, depositID string,
 
 func (s *Store) SelectUserDepositHistory(ctx context.Context, userID string, limit int) (list []*UserDepositHistory, err error) {
 	ctx, _ = trace.StartSpan(ctx, "BalanceStore.SelectUserDepositHistory")
-	defer trace.EndSpan(ctx, err)
+	defer func() { trace.EndSpan(ctx, err) }()
 
 	const q = `
 SELECT 
