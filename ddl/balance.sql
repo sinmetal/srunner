@@ -49,3 +49,12 @@ ON UserDepositHistory (
 	Amount,
 	Point
 );
+
+CREATE TABLE UserDepositHistorySum (
+    UserID STRING(MAX) NOT NULL,
+    Amount INT64 NOT NULL,
+    Point INT64 NOT NULL,
+    Count INT64 NOT NULL,
+    Note STRING(MAX),
+    UpdatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
+) PRIMARY KEY (UserID);

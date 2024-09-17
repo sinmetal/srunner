@@ -71,6 +71,15 @@ type SupplementaryInformation struct {
 	Tags   []string    `json:"tags"`
 }
 
+type UserDepositHistorySum struct {
+	UserID    string
+	Amount    int64
+	Point     int64
+	Count     int64
+	Note      string
+	UpdatedAt time.Time
+}
+
 func (v *UserDepositHistory) FromRow(row *spanner.Row) (*UserDepositHistory, error) {
 	ret := &UserDepositHistory{}
 
@@ -360,6 +369,34 @@ LIMIT @Limit
 		list = append(list, v)
 	}
 	return list, nil
+}
+
+// InsertOrUpdateUserDepositHistorySum is UserDepositHistorySum TableにInsertOrUpdateする
+func (s *Store) InsertOrUpdateUserDepositHistorySum(ctx context.Context, tx *spanner.ReadWriteTransaction, value *UserDepositHistorySum) (err error) {
+	row, err := tx.ReadRow(ctx, "UserDepositHistorySum", spanner.Key{value.UserID}, []string{"UserID", "Amount", "Point", "Count"})
+	if err != nil {
+		if errors.Is(err, spanner.ErrRowNotFound) {
+			// noop
+		} else {
+			return fmt.Errorf("failed Insert to UserDepositHistorySum: %w", err)
+		}
+	}
+	if row != nil {
+		var count int64
+		if err := row.ColumnByName("Count", &count); err != nil {
+			return fmt.Errorf("failed Insert to UserDepositHistorySum result to Struct: %w", err)
+		}
+		value.Count = count + 1
+	}
+
+	m, err := spanner.InsertOrUpdateStruct("UserDepositHistorySum", value)
+	if err != nil {
+		return err
+	}
+	if err := tx.BufferWrite([]*spanner.Mutation{m}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func CreateUserID(ctx context.Context, id int64) string {
