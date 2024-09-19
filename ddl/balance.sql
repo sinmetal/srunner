@@ -33,6 +33,7 @@ CREATE TABLE UserDepositHistory (
     DepositType int64 NOT NULL,
 	Amount INT64 NOT NULL,
 	Point INT64 NOT NULL,
+    SumVersion STRING(MAX),
     SupplementaryInformation JSON,
 	CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
 ) PRIMARY KEY (UserID, DepositID);

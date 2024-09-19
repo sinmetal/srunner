@@ -60,6 +60,7 @@ type UserDepositHistory struct {
 	DepositType              DepositType `spanner:"-"`
 	Amount                   int64
 	Point                    int64
+	SumVersion               string
 	SupplementaryInformation *SupplementaryInformation `spanner:"-"`
 	CreatedAt                time.Time
 }
