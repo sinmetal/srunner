@@ -33,6 +33,12 @@ func main() {
 	// SIGTERM handles Cloud Run termination signal.
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
+	runner := os.Getenv("RUNNER")
+	fmt.Printf("runner:%s\n", runner)
+	if runner == "" {
+		panic("runner is empty")
+	}
+
 	user := os.Getenv("USER")
 	fmt.Printf("user:%s\n", user)
 
@@ -106,7 +112,7 @@ func main() {
 	balanceRunner := &balance.DepositAlloyRunner{
 		Store: s,
 	}
-	{
+	if runner == "DEPOSIT" {
 		ar := srunner.NewAppRunner(ctx, 50, 50)
 		ar.Run(ctx, "Balance.Deposit", balanceRunner)
 	}
@@ -114,7 +120,7 @@ func main() {
 	readUserBalanceRunner := &balance.ReadUserBalancesAlloyRunner{
 		Store: s,
 	}
-	{
+	if runner == "READ_USER_BALANCES" {
 		ar := srunner.NewAppRunner(ctx, 50, 50)
 		ar.Run(ctx, "Balance.ReadUserBalances", readUserBalanceRunner)
 	}
