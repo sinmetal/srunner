@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,11 +12,15 @@ import (
 )
 
 type StoreAlloy struct {
-	pool *pgxpool.Pool
+	pool            *pgxpool.Pool
+	readReplicaPool []*pgxpool.Pool
 }
 
-func NewStoreAlloy(pool *pgxpool.Pool) *StoreAlloy {
-	return &StoreAlloy{pool: pool}
+func NewStoreAlloy(pool *pgxpool.Pool, readReplicaPool []*pgxpool.Pool) *StoreAlloy {
+	return &StoreAlloy{
+		pool:            pool,
+		readReplicaPool: readReplicaPool,
+	}
 }
 
 func (s *StoreAlloy) UserDepositHistoryTable() string {
@@ -121,4 +126,49 @@ INSERT INTO UserBalance (UserID, Amount, Point) VALUES
 		return err
 	}
 	return nil
+}
+
+// ReadUserBalances is 指定した複数のUserIDのBalanceを取得する
+// defaultではReadReplicaから取得される。primary=trueにするとprimary instanceから取得される
+func (s *StoreAlloy) ReadUserBalances(ctx context.Context, userIDs []string, primary bool) (models []*UserBalance, err error) {
+	ctx, _ = trace.StartSpan(ctx, "BalanceStoreAlloy.ReadUserBalances")
+	defer func() { trace.EndSpan(ctx, err) }()
+
+	var pool *pgxpool.Pool
+	if !primary && len(s.readReplicaPool) > 0 {
+		pool = s.readReplicaPool[0]
+	} else {
+		pool = s.pool
+	}
+	placeholders := make([]string, len(userIDs))
+	for i := range placeholders {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+	}
+	sql := fmt.Sprintf(`
+SELECT UserID, Amount, Point FROM UserBalance WHERE UserID IN (%s)
+`, strings.Join(placeholders, ","))
+	//fmt.Println(sql)
+	var args []any
+	for _, userID := range userIDs {
+		args = append(args, userID)
+	}
+
+	var results []*UserBalance
+	rows, err := pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, fmt.Errorf("read user balances: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		columns, err := rows.Values()
+		if err != nil {
+			return nil, fmt.Errorf("read user balances: %w", err)
+		}
+		results = append(results, &UserBalance{
+			UserID: columns[0].(string),
+			Amount: columns[1].(int64),
+			Point:  columns[2].(int64),
+		})
+	}
+	return results, nil
 }

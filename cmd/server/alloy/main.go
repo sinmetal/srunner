@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sinmetal/srunner"
 	"github.com/sinmetal/srunner/balance"
 	"github.com/sinmetal/srunner/internal/alloy"
@@ -42,6 +43,9 @@ func main() {
 	}
 	fmt.Printf("instance name:%s\n", instanceName)
 
+	readReplicaInstanceName := os.Getenv("READ_REPLICA_INSTANCE_NAME")
+	fmt.Printf("read replica instance name:%s\n", readReplicaInstanceName)
+
 	password := os.Getenv("PASSWORD") // TODO passwordを適当になんとかする hello alloy
 	if password == "" {
 		panic("password is empty")
@@ -64,6 +68,28 @@ func main() {
 		}
 	}()
 
+	var readReplicaPgxPool []*pgxpool.Pool
+	if len(readReplicaInstanceName) > 0 {
+		pgxCon, cleanup, err := alloy.ConnectPgx(ctx, instanceName, user, password, "quickstart_db")
+		if err != nil {
+			panic(err)
+		}
+		defer pgxCon.Close()
+		defer func() {
+			if err := cleanup(); err != nil {
+				panic(fmt.Errorf("failed cleanup : %w", err))
+			}
+		}()
+		func() {
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+			if err := pgxCon.Ping(ctx); err != nil {
+				panic(fmt.Errorf("failed ping : %w", err))
+			}
+		}()
+		readReplicaPgxPool = append(readReplicaPgxPool, pgxCon)
+	}
+
 	var serviceName = "srunner"
 	configServiceName := os.Getenv("SRUNNER_SERVICE_NAME")
 	if configServiceName != "" {
@@ -76,13 +102,22 @@ func main() {
 		panic(err)
 	}
 
-	s := balance.NewStoreAlloy(pgxCon)
-	balanceRunner := &balance.AlloyRunner{
+	s := balance.NewStoreAlloy(pgxCon, readReplicaPgxPool)
+	balanceRunner := &balance.DepositAlloyRunner{
 		Store: s,
 	}
+	{
+		ar := srunner.NewAppRunner(ctx, 50, 50)
+		ar.Run(ctx, "Balance.Deposit", balanceRunner)
+	}
 
-	ar := srunner.NewAppRunner(ctx, 50, 50)
-	ar.Run(ctx, "Balance.Deposit", balanceRunner)
+	readUserBalanceRunner := &balance.ReadUserBalancesAlloyRunner{
+		Store: s,
+	}
+	{
+		ar := srunner.NewAppRunner(ctx, 50, 50)
+		ar.Run(ctx, "Balance.ReadUserBalances", readUserBalanceRunner)
+	}
 
 	// Receive output from signalChan.
 	sig := <-signalChan
