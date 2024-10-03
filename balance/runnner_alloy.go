@@ -6,11 +6,11 @@ import (
 	"math/rand"
 )
 
-type AlloyRunner struct {
+type DepositAlloyRunner struct {
 	Store *StoreAlloy
 }
 
-func (r *AlloyRunner) Run(ctx context.Context) error {
+func (r *DepositAlloyRunner) Run(ctx context.Context) error {
 	userAccountID := RandomUserID(ctx)
 	depositID := CreateDepositID(ctx)
 	var amount int64
@@ -41,6 +41,23 @@ func (r *AlloyRunner) Run(ctx context.Context) error {
 	}
 	if err := r.Store.Deposit(ctx, userAccountID, depositID, depositType, amount, point); err != nil {
 		return fmt.Errorf("failed BalanceStore.Deposit %w", err)
+	}
+	return nil
+}
+
+type ReadUserBalancesAlloyRunner struct {
+	Store *StoreAlloy
+}
+
+func (r *ReadUserBalancesAlloyRunner) Run(ctx context.Context) error {
+	var userAccountIDs []string
+	for i := 0; i < 100; i++ {
+		userAccountIDs = append(userAccountIDs, RandomUserID(ctx))
+	}
+
+	_, err := r.Store.ReadUserBalances(ctx, userAccountIDs, false)
+	if err != nil {
+		return fmt.Errorf("failed ReadUserBalances %w", err)
 	}
 	return nil
 }
