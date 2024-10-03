@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/alloydbconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	metadatabox "github.com/sinmetalcraft/gcpbox/metadata"
 )
 
 // connectPgx establishes a connection to your database using pgxpool and the
@@ -60,6 +61,9 @@ func ConnectPgx(
 
 	// Tell pgx to use alloydbconn.Dialer to connect to the instance.
 	config.ConnConfig.DialFunc = func(ctx context.Context, _ string, _ string) (net.Conn, error) {
+		if !metadatabox.OnGCP() {
+			return d.Dial(ctx, instURI, alloydbconn.WithPublicIP())
+		}
 		return d.Dial(ctx, instURI)
 	}
 
