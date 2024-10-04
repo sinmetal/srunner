@@ -50,12 +50,22 @@ type ReadUserBalancesAlloyRunner struct {
 }
 
 func (r *ReadUserBalancesAlloyRunner) Run(ctx context.Context) error {
+	m := make(map[string]bool)
 	var userAccountIDs []string
-	for i := 0; i < 100; i++ {
-		userAccountIDs = append(userAccountIDs, RandomUserID(ctx))
+	for {
+		userAccountID := RandomUserID(ctx)
+		_, ok := m[userAccountID]
+		if ok {
+			continue
+		}
+		userAccountIDs = append(userAccountIDs, userAccountID)
+		m[userAccountID] = true
+		if len(userAccountIDs) >= 100 {
+			break
+		}
 	}
 
-	_, err := r.Store.ReadUserBalances(ctx, userAccountIDs, false)
+	models, err := r.Store.ReadUserBalances(ctx, userAccountIDs, false)
 	if err != nil {
 		return fmt.Errorf("failed ReadUserBalances %w", err)
 	}
