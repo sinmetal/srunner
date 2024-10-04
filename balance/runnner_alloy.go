@@ -65,7 +65,7 @@ func (r *ReadUserBalancesAlloyRunner) Run(ctx context.Context) error {
 		}
 	}
 
-	models, err := r.Store.ReadUserBalances(ctx, userAccountIDs, false)
+	_, err := r.Store.ReadUserBalances(ctx, userAccountIDs, false)
 	if err != nil {
 		return fmt.Errorf("failed ReadUserBalances %w", err)
 	}
