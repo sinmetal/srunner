@@ -400,6 +400,59 @@ func (s *Store) InsertOrUpdateUserDepositHistorySum(ctx context.Context, tx *spa
 	return nil
 }
 
+// FindUserDepositHistories is 指定したuserIDのUserDepositHistoryの最新100件を取得する
+// SQLで最初から取得すれば良いが、GetMultiをやるめたにワンクッション置いている
+func (s *Store) FindUserDepositHistories(ctx context.Context, userID string) (models []*UserDepositHistory, err error) {
+	ctx, _ = trace.StartSpan(ctx, "BalanceStore.FindUserDepositHistories")
+	defer func() { trace.EndSpan(ctx, err) }()
+
+	var userDepositHistoryKeys []spanner.Key
+	{
+		stm := spanner.NewStatement("SELECT UserID, DepositID FROM UserDepositHistory WHERE UserID = @UserID ORDER BY CreatedAt DESC LIMIT 100")
+		stm.Params = map[string]interface{}{"UserID": userID}
+		iter := s.sc.Single().Query(ctx, stm)
+		defer iter.Stop()
+		for {
+			row, err := iter.Next()
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed FindUserDepositHistories : %w", err)
+			}
+			var userID string
+			if err := row.ColumnByName("UserID", &userID); err != nil {
+				return nil, fmt.Errorf("failed UserID ColumnByName : %w", err)
+			}
+			var depositID string
+			if err := row.ColumnByName("DepositID", &depositID); err != nil {
+				return nil, fmt.Errorf("failed DepositID ColumnByName : %w", err)
+			}
+			userDepositHistoryKeys = append(userDepositHistoryKeys, spanner.Key{userID, depositID})
+		}
+	}
+
+	var results []*UserDepositHistory
+	iter := s.sc.Single().Read(ctx, s.UserDepositHistoryTable(), spanner.KeySetFromKeys(userDepositHistoryKeys...),
+		[]string{"UserID", "DepositID", "Amount", "Point"})
+	defer iter.Stop()
+	for {
+		row, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed FindUserDepositHistories : %w", err)
+		}
+		var v UserDepositHistory
+		if err := row.ToStruct(&v); err != nil {
+			return nil, fmt.Errorf("failed row.Struct() FindUserDepositHistories : %w", err)
+		}
+		results = append(results, &v)
+	}
+	return results, nil
+}
+
 func CreateUserID(ctx context.Context, id int64) string {
 	return fmt.Sprintf("u%010d", id)
 }

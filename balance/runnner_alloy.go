@@ -72,11 +72,11 @@ func (r *ReadUserBalancesAlloyRunner) Run(ctx context.Context) error {
 	return nil
 }
 
-type FindUserDepositHistoriesRunner struct {
+type FindUserDepositHistoriesAlloyRunner struct {
 	Store *StoreAlloy
 }
 
-func (r *FindUserDepositHistoriesRunner) Run(ctx context.Context) error {
+func (r *FindUserDepositHistoriesAlloyRunner) Run(ctx context.Context) error {
 	userAccountID := RandomUserID(ctx)
 	models, err := r.Store.FindUserDepositHistories(ctx, userAccountID, false)
 	if err != nil {

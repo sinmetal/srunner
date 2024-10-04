@@ -125,7 +125,7 @@ func main() {
 		ar.Run(ctx, "Balance.ReadUserBalances", readUserBalanceRunner)
 	}
 
-	findUserDepositHistoriesRunner := &balance.FindUserDepositHistoriesRunner{
+	findUserDepositHistoriesRunner := &balance.FindUserDepositHistoriesAlloyRunner{
 		Store: s,
 	}
 	if runner == "FIND_USER_DEPOSIT_HISTORIES" {
