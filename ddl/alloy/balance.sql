@@ -28,3 +28,6 @@ CREATE TABLE UserDepositHistory (
     CreatedAt timestamp with time zone NOT NULL DEFAULT NOW(),
     PRIMARY KEY (UserId, DepositId)
 );
+
+CREATE INDEX idx_user_deposit_history_user_id_created_at_desc
+    ON UserDepositHistory (UserID, CreatedAt DESC);
