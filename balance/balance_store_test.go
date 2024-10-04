@@ -12,6 +12,37 @@ import (
 	"github.com/sinmetal/srunner/internal/trace"
 )
 
+func TestStore_Deposit(t *testing.T) {
+	ctx := context.Background()
+
+	trace.Init(ctx, "unit-test", "v0.0.0")
+
+	spannerProjectID := os.Getenv("SRUNNER_SPANNER_PROJECT_ID")
+	spannerInstanceID := os.Getenv("SRUNNER_SPANNER_INSTANCE_ID")
+	spannerDatabaseID := os.Getenv("SRUNNER_SPANNER_DATABASE_ID")
+
+	dbName := fmt.Sprintf("projects/%s/instances/%s/databases/%s", spannerProjectID, spannerInstanceID, spannerDatabaseID)
+
+	sCli, err := spanner.NewClient(ctx, dbName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := balance.NewStore(ctx, sCli)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for {
+		depositID := balance.CreateDepositID(ctx)
+		ub, udh, err := s.Deposit(ctx, "u0000000001", depositID, balance.DepositTypeBank, 10000, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pp.Print(ub)
+		pp.Print(udh)
+	}
+}
+
 func TestStore_DepositDML(t *testing.T) {
 	t.SkipNow()
 

@@ -117,3 +117,17 @@ func (r *DepositDMLRunner) Run(ctx context.Context) error {
 	}
 	return nil
 }
+
+type FindUserDepositHistoriesRunner struct {
+	BalanceStore *Store
+}
+
+func (r *FindUserDepositHistoriesRunner) Run(ctx context.Context) error {
+	userID := RandomUserID(ctx)
+	models, err := r.BalanceStore.FindUserDepositHistories(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed FindUserDepositHistories err=%s\n", err)
+	}
+	fmt.Printf("FindUserDepositHistories length %d\n", len(models))
+	return nil
+}
