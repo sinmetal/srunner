@@ -172,3 +172,76 @@ SELECT UserID, Amount, Point FROM UserBalance WHERE UserID IN (%s)
 	}
 	return results, nil
 }
+
+// FindUserDepositHistories is 指定したuserIDのUserDepositHistoryを100件取得する
+// SQLだと本来普通にSELECTすれば良いだけだが、GetMultiをするためにPKだけ取得した後、INで再度取得している
+func (s *StoreAlloy) FindUserDepositHistories(ctx context.Context, userID string, primary bool) (models []*UserDepositHistory, err error) {
+	ctx, _ = trace.StartSpan(ctx, "BalanceStoreAlloy.FindUserDepositHistories")
+	defer func() { trace.EndSpan(ctx, err) }()
+
+	var pool *pgxpool.Pool
+	if !primary && len(s.readReplicaPool) > 0 {
+		pool = s.readReplicaPool[0]
+	} else {
+		pool = s.pool
+	}
+
+	var userDepositHistoryKeys []*UserDepositHistory
+	selectLatestDepositHistories := fmt.Sprintf(`
+		SELECT UserId, DepositId FROM UserDepositHistory WHERE UserID = @UserID ORDER BY CreatedAt DESC
+		`)
+	iter, err := pool.Query(ctx, selectLatestDepositHistories, pgx.NamedArgs{"UserID": userID})
+	if err != nil {
+		return nil, fmt.Errorf("read user deposit histories: %w", err)
+	}
+	defer iter.Close()
+	for iter.Next() {
+		columns, err := iter.Values()
+		if err != nil {
+			return nil, fmt.Errorf("read user deposit histories: %w", err)
+		}
+		userDepositHistoryKeys = append(userDepositHistoryKeys, &UserDepositHistory{
+			UserID:    columns[0].(string),
+			DepositID: columns[1].(string),
+		})
+	}
+
+	placeholders := make([]string, len(userDepositHistoryKeys))
+	for i := range placeholders {
+		a := 1 + i*2
+		placeholders[i] = fmt.Sprintf("($%d, $%d)", a, a+1)
+	}
+	sql := fmt.Sprintf(`
+SELECT UserID, DepositID, DepositType, Amount, Point FROM UserDepositHistory
+WHERE (UserID, DepositID) IN (
+    %s
+);
+`, strings.Join(placeholders, ","))
+	//fmt.Println(sql)
+	var args []any
+	for _, v := range userDepositHistoryKeys {
+		args = append(args, v.UserID)
+		args = append(args, v.DepositID)
+	}
+
+	var results []*UserDepositHistory
+	rows, err := pool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, fmt.Errorf("read user balances: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		columns, err := rows.Values()
+		if err != nil {
+			return nil, fmt.Errorf("read user balances: %w", err)
+		}
+		results = append(results, &UserDepositHistory{
+			UserID:      columns[0].(string),
+			DepositID:   columns[1].(string),
+			DepositType: DepositType(columns[2].(int64)),
+			Amount:      columns[3].(int64),
+			Point:       columns[4].(int64),
+		})
+	}
+	return results, nil
+}

@@ -125,6 +125,14 @@ func main() {
 		ar.Run(ctx, "Balance.ReadUserBalances", readUserBalanceRunner)
 	}
 
+	findUserDepositHistoriesRunner := &balance.FindUserDepositHistoriesRunner{
+		Store: s,
+	}
+	if runner == "FIND_USER_DEPOSIT_HISTORIES" {
+		ar := srunner.NewAppRunner(ctx, 50, 50)
+		ar.Run(ctx, "Balance.FindUserDepositHistories", findUserDepositHistoriesRunner)
+	}
+
 	// Receive output from signalChan.
 	sig := <-signalChan
 	fmt.Printf("--%s signal caught--\n", sig)
