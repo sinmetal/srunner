@@ -60,6 +60,7 @@ type UserDepositHistory struct {
 	DepositType              DepositType `spanner:"-"`
 	Amount                   int64
 	Point                    int64
+	SumVersion               string
 	SupplementaryInformation *SupplementaryInformation `spanner:"-"`
 	CreatedAt                time.Time
 }
@@ -69,6 +70,15 @@ type SupplementaryInformation struct {
 	Rating float64     `json:"rating"`
 	Open   interface{} `json:"open"`
 	Tags   []string    `json:"tags"`
+}
+
+type UserDepositHistorySum struct {
+	UserID    string
+	Amount    int64
+	Point     int64
+	Count     int64
+	Note      string
+	UpdatedAt time.Time
 }
 
 func (v *UserDepositHistory) FromRow(row *spanner.Row) (*UserDepositHistory, error) {
@@ -360,6 +370,87 @@ LIMIT @Limit
 		list = append(list, v)
 	}
 	return list, nil
+}
+
+// InsertOrUpdateUserDepositHistorySum is UserDepositHistorySum TableにInsertOrUpdateする
+func (s *Store) InsertOrUpdateUserDepositHistorySum(ctx context.Context, tx *spanner.ReadWriteTransaction, value *UserDepositHistorySum) (err error) {
+	row, err := tx.ReadRow(ctx, "UserDepositHistorySum", spanner.Key{value.UserID}, []string{"UserID", "Amount", "Point", "Count"})
+	if err != nil {
+		if errors.Is(err, spanner.ErrRowNotFound) {
+			// noop
+		} else {
+			return fmt.Errorf("failed Insert to UserDepositHistorySum: %w", err)
+		}
+	}
+	if row != nil {
+		var count int64
+		if err := row.ColumnByName("Count", &count); err != nil {
+			return fmt.Errorf("failed Insert to UserDepositHistorySum result to Struct: %w", err)
+		}
+		value.Count = count + 1
+	}
+
+	m, err := spanner.InsertOrUpdateStruct("UserDepositHistorySum", value)
+	if err != nil {
+		return err
+	}
+	if err := tx.BufferWrite([]*spanner.Mutation{m}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// FindUserDepositHistories is 指定したuserIDのUserDepositHistoryの最新100件を取得する
+// SQLで最初から取得すれば良いが、GetMultiをやるめたにワンクッション置いている
+func (s *Store) FindUserDepositHistories(ctx context.Context, userID string) (models []*UserDepositHistory, err error) {
+	ctx, _ = trace.StartSpan(ctx, "BalanceStore.FindUserDepositHistories")
+	defer func() { trace.EndSpan(ctx, err) }()
+
+	var userDepositHistoryKeys []spanner.Key
+	{
+		stm := spanner.NewStatement("SELECT UserID, DepositID FROM UserDepositHistory WHERE UserID = @UserID ORDER BY CreatedAt DESC LIMIT 100")
+		stm.Params = map[string]interface{}{"UserID": userID}
+		iter := s.sc.Single().Query(ctx, stm)
+		defer iter.Stop()
+		for {
+			row, err := iter.Next()
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed FindUserDepositHistories : %w", err)
+			}
+			var userID string
+			if err := row.ColumnByName("UserID", &userID); err != nil {
+				return nil, fmt.Errorf("failed UserID ColumnByName : %w", err)
+			}
+			var depositID string
+			if err := row.ColumnByName("DepositID", &depositID); err != nil {
+				return nil, fmt.Errorf("failed DepositID ColumnByName : %w", err)
+			}
+			userDepositHistoryKeys = append(userDepositHistoryKeys, spanner.Key{userID, depositID})
+		}
+	}
+
+	var results []*UserDepositHistory
+	iter := s.sc.Single().Read(ctx, s.UserDepositHistoryTable(), spanner.KeySetFromKeys(userDepositHistoryKeys...),
+		[]string{"UserID", "DepositID", "Amount", "Point"})
+	defer iter.Stop()
+	for {
+		row, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed FindUserDepositHistories : %w", err)
+		}
+		var v UserDepositHistory
+		if err := row.ToStruct(&v); err != nil {
+			return nil, fmt.Errorf("failed row.Struct() FindUserDepositHistories : %w", err)
+		}
+		results = append(results, &v)
+	}
+	return results, nil
 }
 
 func CreateUserID(ctx context.Context, id int64) string {
