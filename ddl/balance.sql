@@ -38,6 +38,12 @@ CREATE TABLE UserDepositHistory (
 	CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
 ) PRIMARY KEY (UserID, DepositID);
 
+CREATE INDEX UserIDAndCreatedAtDescByUserDepositHistory
+ON UserDepositHistory (
+    UserID,
+    CreatedAt DESC
+);
+
 CREATE INDEX DepositTypeByUserDepositHistory
 ON UserDepositHistory (
     DepositType
