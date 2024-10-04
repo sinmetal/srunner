@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/sinmetal/srunner/operation"
 	"os"
 	"os/signal"
 	"syscall"
@@ -109,8 +110,10 @@ func main() {
 	}
 
 	s := balance.NewStoreAlloy(pgxCon, readReplicaPgxPool)
+	operationStore := operation.NewStoreAlloy(pgxCon)
 	balanceRunner := &balance.DepositAlloyRunner{
-		Store: s,
+		Store:          s,
+		OperationStore: operationStore,
 	}
 	if runner == "DEPOSIT" {
 		ar := srunner.NewAppRunner(ctx, 50, 50)

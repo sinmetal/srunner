@@ -4,10 +4,15 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/sinmetal/srunner/operation"
 )
 
 type DepositAlloyRunner struct {
-	Store *StoreAlloy
+	Store          *StoreAlloy
+	OperationStore *operation.StoreAlloy
 }
 
 func (r *DepositAlloyRunner) Run(ctx context.Context) error {
@@ -39,8 +44,19 @@ func (r *DepositAlloyRunner) Run(ctx context.Context) error {
 		fmt.Println("unsupported DepositType")
 		return nil
 	}
+	start := time.Now()
 	if err := r.Store.Deposit(ctx, userAccountID, depositID, depositType, amount, point); err != nil {
 		return fmt.Errorf("failed BalanceStore.Deposit %w", err)
+	}
+	elapsed := time.Since(start)
+	_, err := r.OperationStore.Insert(ctx, &operation.OperationAlloy{
+		OperationID:   uuid.New().String(),
+		OperationName: "BalanceStore.Deposit",
+		ElapsedTimeMS: elapsed.Milliseconds(),
+		Note:          "",
+	})
+	if err != nil {
+		return fmt.Errorf("failed OperationStore.Insert err=%s\n", err)
 	}
 	return nil
 }
