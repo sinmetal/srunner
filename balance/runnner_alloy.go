@@ -94,10 +94,9 @@ type FindUserDepositHistoriesAlloyRunner struct {
 
 func (r *FindUserDepositHistoriesAlloyRunner) Run(ctx context.Context) error {
 	userAccountID := RandomUserID(ctx)
-	models, err := r.Store.FindUserDepositHistories(ctx, userAccountID, false)
+	_, err := r.Store.FindUserDepositHistories(ctx, userAccountID, false)
 	if err != nil {
 		return fmt.Errorf("failed FindUserDepositHistories %w", err)
 	}
-	fmt.Printf("FindUserDepositHistories.len %d \n", len(models))
 	return nil
 }

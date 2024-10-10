@@ -406,11 +406,13 @@ func (s *Store) FindUserDepositHistories(ctx context.Context, userID string) (mo
 	ctx, _ = trace.StartSpan(ctx, "BalanceStore.FindUserDepositHistories")
 	defer func() { trace.EndSpan(ctx, err) }()
 
+	ro := s.sc.ReadOnlyTransaction().WithTimestampBound(spanner.ExactStaleness(10 * time.Second))
+	defer ro.Close()
 	var userDepositHistoryKeys []spanner.Key
 	{
 		stm := spanner.NewStatement("SELECT UserID, DepositID FROM UserDepositHistory WHERE UserID = @UserID ORDER BY CreatedAt DESC LIMIT 100")
 		stm.Params = map[string]interface{}{"UserID": userID}
-		iter := s.sc.Single().Query(ctx, stm)
+		iter := ro.Query(ctx, stm)
 		defer iter.Stop()
 		for {
 			row, err := iter.Next()
@@ -433,7 +435,7 @@ func (s *Store) FindUserDepositHistories(ctx context.Context, userID string) (mo
 	}
 
 	var results []*UserDepositHistory
-	iter := s.sc.Single().Read(ctx, s.UserDepositHistoryTable(), spanner.KeySetFromKeys(userDepositHistoryKeys...),
+	iter := ro.Read(ctx, s.UserDepositHistoryTable(), spanner.KeySetFromKeys(userDepositHistoryKeys...),
 		[]string{"UserID", "DepositID", "Amount", "Point"})
 	defer iter.Stop()
 	for {
